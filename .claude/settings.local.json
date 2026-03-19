@@ -8,7 +8,8 @@
       "Bash(git clone:*)",
       "Bash(bash:*)",
       "Bash(C:/Users/dbsup/AppData/Roaming/Python/Python314/Scripts/jupyter-lab.exe:*)",
-      "Bash(claude skills list)"
+      "Bash(claude skills list)",
+      "Read(//home/gabriel/.claude/skills/**)"
     ]
   }
 }
