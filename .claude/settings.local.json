@@ -9,7 +9,16 @@
       "Bash(bash:*)",
       "Bash(C:/Users/dbsup/AppData/Roaming/Python/Python314/Scripts/jupyter-lab.exe:*)",
       "Bash(claude skills list)",
-      "Read(//home/gabriel/.claude/skills/**)"
+      "Read(//home/gabriel/.claude/skills/**)",
+      "SlashCommand(/xlsx)",
+      "Bash(pip install pandas openpyxl)",
+      "Bash(pip3 install pandas openpyxl)",
+      "Bash(python3 -m pip install pandas openpyxl)",
+      "Bash(apt-get update)",
+      "Bash(apt-get install -y python3-pip python3-pandas python3-openpyxl)",
+      "Bash(sudo apt-get update)",
+      "Bash(sudo apt-get install -y python3-pip python3-pandas python3-openpyxl)",
+      "Bash(python3 -c \"import zipfile; print(''zipfile available'')\")"
     ]
   }
 }

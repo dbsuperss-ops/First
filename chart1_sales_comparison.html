@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>사업장별 매출 비교</title>
+</head>
+<body>
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Data
+        const data = [
+            { name: 'KSCE', value: 672678015658, label: '6,726억원' },
+            { name: 'KSCCZ', value: 75538696833, label: '755억원' },
+            { name: 'KCTR', value: 74249076468, label: '742억원' }
+        ];
+
+        // Chart settings
+        const chartX = 200;
+        const chartY = 200;
+        const chartWidth = 1500;
+        const chartHeight = 700;
+        const barWidth = 350;
+        const spacing = 100;
+        const maxValue = Math.max(...data.map(d => d.value));
+
+        // Title
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('사업장별 매출 비교 (2026년)', canvas.width / 2, 100);
+
+        // Draw bars
+        data.forEach((item, index) => {
+            const barHeight = (item.value / maxValue) * chartHeight;
+            const x = chartX + index * (barWidth + spacing);
+            const y = chartY + chartHeight - barHeight;
+
+            // Bar
+            const gradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+            gradient.addColorStop(0, '#2563EB');
+            gradient.addColorStop(1, '#1E40AF');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, barWidth, barHeight);
+
+            // Border
+            ctx.strokeStyle = '#1E3A8A';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, barWidth, barHeight);
+
+            // Value label
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(item.label, x + barWidth / 2, y - 20);
+
+            // Name label
+            ctx.font = 'bold 36px Arial';
+            ctx.fillText(item.name, x + barWidth / 2, chartY + chartHeight + 60);
+        });
+
+        // Y-axis labels
+        ctx.fillStyle = '#666666';
+        ctx.font = '20px Arial';
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 5; i++) {
+            const value = (maxValue / 5) * i;
+            const y = chartY + chartHeight - (chartHeight / 5) * i;
+            const label = Math.round(value / 100000000) + '억원';
+            ctx.fillText(label, chartX - 20, y + 7);
+
+            // Grid line
+            ctx.strokeStyle = '#E5E7EB';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(chartX, y);
+            ctx.lineTo(chartX + chartWidth, y);
+            ctx.stroke();
+        }
+
+        // Export
+        canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chart1_sales_comparison.png';
+            a.click();
+        });
+    </script>
+</body>
+</html>
