@@ -1,0 +1,36 @@
+<Page x:Class="FileFlow.Pages.LogPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Background="#F8F9FA">
+    <Grid Margin="32,24">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="활동 로그" FontSize="28" FontWeight="Bold" Margin="0,0,0,20"/>
+        <Border Grid.Row="1" Margin="0,0,0,16" Padding="20,14" Background="White" CornerRadius="12" Effect="{StaticResource CardShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center"><TextBlock Text="로그 목록" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="TxtLogCount" Text="총 0건" FontSize="13" Foreground="#9CA3AF" Margin="0,2,0,0"/></StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <Button x:Name="BtnRefresh" Content="새로고침" Margin="0,0,10,0" Click="BtnRefresh_Click"/>
+                    <Button x:Name="BtnUndo" Content="되돌리기" Margin="0,0,10,0" Click="BtnUndo_Click"/>
+                    <Button x:Name="BtnClear" Content="전체 삭제" Foreground="#EF4444" Click="BtnClear_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Border Grid.Row="2" Padding="24,20" Background="White" CornerRadius="12" Effect="{StaticResource CardShadow}">
+            <Grid>
+                <StackPanel x:Name="PnlEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="로그가 없습니다" FontSize="16" Foreground="#9CA3AF"/>
+                </StackPanel>
+                <ListView x:Name="LogListView" Visibility="Collapsed" BorderBrush="#E5E7EB" BorderThickness="1">
+                    <ListView.View><GridView>
+                        <GridViewColumn Header="시각" Width="150" DisplayMemberBinding="{Binding Timestamp, StringFormat='yyyy-MM-dd HH:mm:ss'}"/>
+                        <GridViewColumn Header="파일명" Width="200" DisplayMemberBinding="{Binding FileName}"/>
+                        <GridViewColumn Header="작업" Width="70" DisplayMemberBinding="{Binding Action}"/>
+                        <GridViewColumn Header="원본" Width="240" DisplayMemberBinding="{Binding SourcePath}"/>
+                        <GridViewColumn Header="이동" Width="240" DisplayMemberBinding="{Binding TargetPath}"/>
+                    </GridView></ListView.View>
+                </ListView>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

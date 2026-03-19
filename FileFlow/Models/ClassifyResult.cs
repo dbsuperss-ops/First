@@ -1,0 +1,1 @@
+namespace FileFlow.Models { public class ClassifyResult { public string FileName { get; set; } = ""; public string SourcePath { get; set; } = ""; public string TargetPath { get; set; } = ""; public string RuleName { get; set; } = ""; public long FileSize { get; set; } } }

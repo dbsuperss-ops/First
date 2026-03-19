@@ -1,0 +1,191 @@
+<Window x:Class="FileLister.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="FileLister" Height="780" Width="1200"
+        Icon="AppIcon.ico">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 0: 폴더 선택 -->
+            <RowDefinition Height="Auto"/>  <!-- 1: 검색/필터 -->
+            <RowDefinition Height="Auto"/>  <!-- 2: 고급 필터 (날짜·크기) -->
+            <RowDefinition Height="Auto"/>  <!-- 3: 진행률 (스캔 중에만 표시) -->
+            <RowDefinition Height="*"/>     <!-- 4: DataGrid -->
+            <RowDefinition Height="Auto"/>  <!-- 5: 하단 버튼 -->
+        </Grid.RowDefinitions>
+
+        <!-- ===== 0: 폴더 선택 ===== -->
+        <Border Grid.Row="0" Padding="10" CornerRadius="8" Background="#F5F5F5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- [기능3] 폴더 목록 -->
+                <ListBox Grid.Row="0" Grid.Column="0"
+                         ItemsSource="{Binding RootFolders}"
+                         SelectedItem="{Binding SelectedFolder}"
+                         Height="80" Margin="0,0,8,0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="4,2"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Top">
+                    <Button Content="폴더 추가" Width="100" Height="28" Margin="0,0,0,4"
+                            Command="{Binding AddFolderCommand}"/>
+                    <Button Content="선택 제거" Width="100" Height="28"
+                            Command="{Binding RemoveFolderCommand}"/>
+                </StackPanel>
+
+                <!-- 스캔 옵션 + 스캔 버튼 -->
+                <Grid Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <CheckBox Grid.Column="0" VerticalAlignment="Center" Content="하위 폴더 포함"
+                              IsChecked="{Binding IncludeSubfolders}" Margin="0,0,16,0"/>
+                    <!-- [기능1] 숨김/시스템 파일 제외 -->
+                    <CheckBox Grid.Column="1" VerticalAlignment="Center" Content="숨김 파일 제외"
+                              IsChecked="{Binding ExcludeHiddenFiles}" Margin="0,0,16,0"/>
+                    <CheckBox Grid.Column="2" VerticalAlignment="Center" Content="시스템 파일 제외"
+                              IsChecked="{Binding ExcludeSystemFiles}" Margin="0,0,0,0"/>
+                    <Button Grid.Column="4" Content="스캔" Width="100" Height="28"
+                            Command="{Binding ScanCommand}"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- ===== 1: 검색/카테고리 필터 ===== -->
+        <Border Grid.Row="1" Padding="10" CornerRadius="8" Background="#F5F5F5" Margin="0,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="240"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="160"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock VerticalAlignment="Center" Text="검색 (파일명/폴더):" Margin="0,0,8,0"/>
+                <TextBox Grid.Column="1" Height="28" VerticalContentAlignment="Center"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,12,0"/>
+
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="카테고리:" Margin="0,0,8,0"/>
+                <ComboBox Grid.Column="3" Height="28"
+                          ItemsSource="{Binding CategoryOptions}"
+                          SelectedItem="{Binding SelectedCategory}"
+                          Margin="0,0,12,0"/>
+
+                <TextBlock Grid.Column="4" VerticalAlignment="Center"
+                           Text="{Binding StatusText}" Margin="0,0,12,0" Foreground="#555"/>
+
+                <Button Grid.Column="5" Content="CSV 저장" Width="100" Height="28" Margin="0,0,8,0"
+                        Command="{Binding ExportCsvCommand}"/>
+                <Button Grid.Column="6" Content="경로 복사" Width="100" Height="28"
+                        Command="{Binding CopyPathsCommand}"/>
+            </Grid>
+        </Border>
+
+        <!-- ===== 2: 고급 필터 (날짜·크기 범위) ===== -->
+        <Border Grid.Row="2" Padding="10" CornerRadius="8" Background="#F5F5F5" Margin="0,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="130"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- [기능4] 수정일 범위 -->
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="수정일:" Margin="0,0,8,0"/>
+                <DatePicker Grid.Column="1"
+                            SelectedDate="{Binding FilterDateFrom}"
+                            Height="28"/>
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="~" Margin="8,0,8,0"/>
+                <DatePicker Grid.Column="3"
+                            SelectedDate="{Binding FilterDateTo}"
+                            Height="28"/>
+
+                <!-- [기능4] 크기 범위 -->
+                <TextBlock Grid.Column="4" VerticalAlignment="Center" Text="크기 (KB):" Margin="16,0,8,0"/>
+                <TextBox Grid.Column="5" Height="28" VerticalContentAlignment="Center"
+                         Text="{Binding FilterSizeMinKb, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Grid.Column="6" VerticalAlignment="Center" Text="~" Margin="8,0,8,0"/>
+                <TextBox Grid.Column="7" Height="28" VerticalContentAlignment="Center"
+                         Text="{Binding FilterSizeMaxKb, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <Button Grid.Column="9" Content="필터 초기화" Width="100" Height="28"
+                        Command="{Binding ResetFilterCommand}"/>
+            </Grid>
+        </Border>
+
+        <!-- ===== 3: 진행률 (스캔 중에만 표시) ===== -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,8,0,0"
+                    Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibility}}">
+            <ProgressBar Width="500" Height="10" IsIndeterminate="True" VerticalAlignment="Center"/>
+            <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#1976D2"
+                       Text="{Binding ScannedCount, StringFormat={}{0:N0}개 발견 중...}"/>
+        </StackPanel>
+
+        <!-- ===== 4: DataGrid ===== -->
+        <DataGrid Grid.Row="4" Margin="0,8,0,0"
+                  ItemsSource="{Binding FilteredItems}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  IsReadOnly="True"
+                  SelectionMode="Extended"
+                  GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column"
+                  RowHeight="26"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="파일명"   Binding="{Binding FileName}"    Width="2*"/>
+                <DataGridTextColumn Header="확장자"   Binding="{Binding Extension}"   Width="70"/>
+                <DataGridTextColumn Header="분류"     Binding="{Binding Category}"    Width="90"/>
+                <DataGridTextColumn Header="크기"     Binding="{Binding SizeFormatted}" Width="100"/>
+                <DataGridTextColumn Header="생성일"
+                    Binding="{Binding CreatedTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Width="150"/>
+                <DataGridTextColumn Header="수정일"
+                    Binding="{Binding LastWriteTime, StringFormat=yyyy-MM-dd HH:mm:ss}" Width="150"/>
+                <DataGridTextColumn Header="폴더"     Binding="{Binding DirectoryPath}" Width="3*"/>
+                <DataGridTextColumn Header="전체경로" Binding="{Binding FullPath}"    Width="4*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- ===== 5: 하단 버튼 ===== -->
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="닫기" Width="90" Height="30" Command="{Binding CloseCommand}"/>
+        </StackPanel>
+    </Grid>
+</Window>

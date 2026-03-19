@@ -1,0 +1,3 @@
+using System;
+using System.IO;
+namespace FileFlow.Services { public static class ErrorService { private static readonly string ErrorLogPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FileFlow", "error.log"); public static void Report(Exception ex, string context = "") { try { Directory.CreateDirectory(Path.GetDirectoryName(ErrorLogPath)!); string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{context}] {ex.GetType().Name}: {ex.Message}{Environment.NewLine}"; File.AppendAllText(ErrorLogPath, line); } catch { } } public static string GetErrorLogPath() => ErrorLogPath; } }

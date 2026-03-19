@@ -1,0 +1,19 @@
+# Build outputs
+bin/
+obj/
+publish/
+*.exe
+*.dll
+*.pdb
+*.zst
+
+# Extensions (large binaries)
+extensions/
+
+# VS/IDE
+.vs/
+*.user
+
+# Python
+__pycache__/
+*.pyc

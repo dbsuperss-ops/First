@@ -1,0 +1,284 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DupeFinderPro.ViewModels"
+             x:Class="DupeFinderPro.Views.NewScanView"
+             x:DataType="vm:NewScanViewModel">
+
+    <UserControl.Styles>
+        <!-- CalendarDatePicker의 캘린더 버튼("18" 아이콘) 숨김 -->
+        <Style Selector="CalendarDatePicker /template/ Button">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+
+        <!-- ── 스캔 시작 버튼 (하단 고정) ──────────────────── -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{StaticResource ContentBgBrush}"
+                BorderThickness="0 1 0 0"
+                BorderBrush="{StaticResource BorderBrush}"
+                Padding="32 16">
+            <Button Classes="primary" HorizontalAlignment="Right"
+                    Padding="24 12" FontSize="15"
+                    Content="스캔 시작 →"
+                    Command="{Binding StartScanCommand}"/>
+        </Border>
+
+        <!-- ── 스크롤 영역 ────────────────────────────────── -->
+        <ScrollViewer Padding="32 28 32 0">
+            <StackPanel Spacing="24" MaxWidth="760">
+
+                <!-- ── 헤더 ──────────────────────────────────────── -->
+                <StackPanel Spacing="4">
+                    <TextBlock Classes="page-title" Text="새 스캔"/>
+                    <TextBlock Classes="muted" Text="중복 파일 스캔을 위한 폴더와 필터를 설정하세요"/>
+                </StackPanel>
+
+                <!-- ── 유효성 오류 ────────────────────────────────── -->
+                <Border Background="#FFF5F5" CornerRadius="8" Padding="14 10"
+                        IsVisible="{Binding HasValidationError}">
+                    <TextBlock Foreground="{StaticResource StatusRedBrush}"
+                               Text="{Binding ValidationError}"/>
+                </Border>
+
+                <!-- ── 스캔 이름 ─────────────────────────────────── -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="section-title" Text="스캔 이름"/>
+                        <TextBox Classes="input"
+                                 Text="{Binding ScanName}"
+                                 Watermark="스캔 이름을 입력하세요…"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── 검색 폴더 ────────────────────────────────── -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Classes="section-title" Text="검색 폴더"/>
+                        <TextBlock Classes="muted" Text="중복 파일을 검색할 폴더를 최소 하나 이상 추가하세요."/>
+
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Classes="input"
+                                     Text="{Binding NewIncludePath}"
+                                     Watermark="예: C:\Users\사용자\문서"/>
+                            <Button Grid.Column="1" Classes="secondary"
+                                    Content="📁"
+                                    ToolTip.Tip="폴더 선택"
+                                    Click="BrowseIncludeFolder_Click"/>
+                            <Button Grid.Column="2" Classes="primary"
+                                    Content="추가"
+                                    Command="{Binding AddIncludePathCommand}"/>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding IncludePaths}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10 6" CornerRadius="6"
+                                            Background="#F7FAFC" Margin="0 2">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Text="{Binding}"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <Button Grid.Column="1" Content="✕"
+                                                    Foreground="{StaticResource StatusRedBrush}"
+                                                    Background="Transparent"
+                                                    Command="{Binding $parent[UserControl].DataContext.RemoveIncludePathCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="6 2"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── 제외 폴더 ────────────────────────────────── -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Classes="section-title" Text="제외 폴더 (선택)"/>
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Classes="input"
+                                     Text="{Binding NewExcludePath}"
+                                     Watermark="예: C:\Users\사용자\AppData"/>
+                            <Button Grid.Column="1" Classes="secondary"
+                                    Content="📁"
+                                    ToolTip.Tip="폴더 선택"
+                                    Click="BrowseExcludeFolder_Click"/>
+                            <Button Grid.Column="2" Classes="secondary"
+                                    Content="추가"
+                                    Command="{Binding AddExcludePathCommand}"/>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding ExcludePaths}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10 6" CornerRadius="6"
+                                            Background="#FFF5F5" Margin="0 2">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Text="{Binding}"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <Button Grid.Column="1" Content="✕"
+                                                    Foreground="{StaticResource StatusRedBrush}"
+                                                    Background="Transparent"
+                                                    Command="{Binding $parent[UserControl].DataContext.RemoveExcludePathCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Padding="6 2"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── 파일 유형 ───────────────────────────────── -->
+                <Border Classes="card">
+                    <StackPanel Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock Classes="section-title" Text="파일 유형"/>
+                            <Button Grid.Column="1" Classes="secondary" Content="전체 선택"
+                                    Command="{Binding SelectAllFileTypesCommand}" Margin="0 0 6 0"/>
+                            <Button Grid.Column="2" Classes="secondary" Content="전체 해제"
+                                    Command="{Binding ClearAllFileTypesCommand}"/>
+                        </Grid>
+                        <TextBlock Classes="muted"
+                                   Text="선택하지 않으면 모든 파일 유형을 검색합니다."/>
+                        <ItemsControl ItemsSource="{Binding FileTypeCategories}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="4"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FileTypeCategoryViewModel">
+                                    <Border Margin="0 0 8 8" Padding="12 8"
+                                            CornerRadius="8" BorderThickness="1"
+                                            BorderBrush="{StaticResource BorderBrush}"
+                                            Background="{StaticResource CardBgBrush}">
+                                        <StackPanel Spacing="4">
+                                            <CheckBox IsChecked="{Binding IsSelected}"
+                                                      Content="{Binding Label}"
+                                                      FontWeight="Medium"/>
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding Description}"
+                                                       Margin="20 0 0 0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── 고급 필터 ──────────────────────────────── -->
+                <Border Classes="card">
+                    <StackPanel Spacing="16">
+                        <TextBlock Classes="section-title" Text="고급 필터"/>
+
+                        <!-- 확장자 필터 -->
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Classes="label" Text="포함 확장자"/>
+                                <TextBox Classes="input"
+                                         Text="{Binding IncludeExtensionsRaw}"
+                                         Watermark=".pdf, .docx, .jpg"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Classes="label" Text="제외 확장자"/>
+                                <TextBox Classes="input"
+                                         Text="{Binding ExcludeExtensionsRaw}"
+                                         Watermark=".tmp, .log"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 키워드 필터 -->
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Classes="label" Text="파일명 포함 키워드"/>
+                                <TextBox Classes="input"
+                                         Text="{Binding IncludeKeywordsRaw}"
+                                         Watermark="backup, copy, screenshot"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Classes="label" Text="파일명 제외 키워드"/>
+                                <TextBox Classes="input"
+                                         Text="{Binding ExcludeKeywordsRaw}"
+                                         Watermark="original, master"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 파일 크기 범위 -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="label" Text="파일 크기 범위 (KB)"/>
+                            <Grid ColumnDefinitions="*,Auto,*,Auto" ColumnSpacing="8">
+                                <NumericUpDown Grid.Column="0"
+                                              Value="{Binding MinSizeKb}"
+                                              Minimum="0" Increment="1"
+                                              FormatString="0"
+                                              Watermark="최소"/>
+                                <TextBlock Grid.Column="1" Text="–"
+                                           VerticalAlignment="Center"/>
+                                <NumericUpDown Grid.Column="2"
+                                              Value="{Binding MaxSizeKb}"
+                                              Minimum="0" Increment="1"
+                                              FormatString="0"
+                                              Watermark="최대 (선택)"
+                                              IsEnabled="{Binding HasMaxSize}"/>
+                                <CheckBox Grid.Column="3" Content="최대 설정"
+                                          IsChecked="{Binding HasMaxSize}"
+                                          VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 날짜 범위 -->
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                            <StackPanel Grid.Column="0" Spacing="6">
+                                <TextBlock Classes="label" Text="생성일 범위"/>
+                                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
+                                    <CalendarDatePicker Grid.Column="0"
+                                                        SelectedDate="{Binding CreatedFrom}"
+                                                        Watermark="시작일"/>
+                                    <TextBlock Grid.Column="1" Text="–"
+                                               VerticalAlignment="Center"/>
+                                    <CalendarDatePicker Grid.Column="2"
+                                                        SelectedDate="{Binding CreatedTo}"
+                                                        Watermark="종료일"/>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Classes="label" Text="수정일 범위"/>
+                                <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="6">
+                                    <CalendarDatePicker Grid.Column="0"
+                                                        SelectedDate="{Binding ModifiedFrom}"
+                                                        Watermark="시작일"/>
+                                    <TextBlock Grid.Column="1" Text="–"
+                                               VerticalAlignment="Center"/>
+                                    <CalendarDatePicker Grid.Column="2"
+                                                        SelectedDate="{Binding ModifiedTo}"
+                                                        Watermark="종료일"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── 안전 설정 ──────────────────────────────── -->
+                <Border Classes="card" Margin="0 0 0 8">
+                    <StackPanel Spacing="12">
+                        <TextBlock Classes="section-title" Text="안전 설정"/>
+                        <StackPanel Spacing="8">
+                            <CheckBox IsChecked="{Binding ExcludeSystemFiles}"
+                                      Content="숨김 파일 및 시스템 파일 제외"/>
+                            <CheckBox IsChecked="{Binding Recursive}"
+                                      Content="하위 폴더 재귀 검색"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </DockPanel>
+</UserControl>

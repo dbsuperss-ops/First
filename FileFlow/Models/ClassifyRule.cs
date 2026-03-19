@@ -1,0 +1,2 @@
+using System.Collections.Generic;
+namespace FileFlow.Models { public class ClassifyRule { public string RuleName { get; set; } = ""; public List<FileCondition> Conditions { get; set; } = new(); public string ConditionOperator { get; set; } = "AND"; public string TargetPath { get; set; } = ""; public string Destination { get; set; } = ""; public string DestinationMode { get; set; } = "Default"; } }

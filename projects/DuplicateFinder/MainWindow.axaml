@@ -1,0 +1,64 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DuplicateFinder.MainWindow"
+        Title="프로페셔널 중복 파일 관리자 (Hash 기반)" Width="1000" Height="750">
+    <Grid RowDefinitions="Auto, *, Auto" Margin="20">
+        <!-- 1. 설정 및 필터링 영역 -->
+        <StackPanel Grid.Row="0" Spacing="10">
+            <TextBlock Text="검색 설정 및 필터" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"/>
+            
+            <Grid ColumnDefinitions="*, 120" RowDefinitions="Auto, Auto">
+                <TextBox Name="PathInput" Watermark="검색할 폴더 경로를 입력하세요 (여러 개일 경우 세미콜론(;)으로 구분)"/>
+                <Button Grid.Column="1" Content="스캔 시작" Click="OnScanClick" HorizontalAlignment="Stretch" Background="#2196F3" Foreground="White" Margin="5,0,0,0"/>
+            </Grid>
+
+            <UniformGrid Columns="3">
+                <StackPanel Margin="5">
+                    <TextBlock Text="확장자 포함 (예: .jpg, .mp4)"/>
+                    <TextBox Name="ExtInclude" Watermark="비워두면 전체 검색"/>
+                </StackPanel>
+                <StackPanel Margin="5">
+                    <TextBlock Text="확장자 제외 (예: .exe, .tmp)"/>
+                    <TextBox Name="ExtExclude"/>
+                </StackPanel>
+                <StackPanel Margin="5">
+                    <TextBlock Text="파일명 키워드 필터"/>
+                    <TextBox Name="KeywordFilter"/>
+                </StackPanel>
+            </UniformGrid>
+
+            <UniformGrid Columns="3">
+                <StackPanel Margin="5">
+                    <TextBlock Text="최소 크기 (KB)"/>
+                    <NumericUpDown Name="MinSizeNum" Value="0"/>
+                </StackPanel>
+                <StackPanel Margin="5">
+                    <TextBlock Text="날짜 범위 (이후)"/>
+                    <DatePicker Name="DateFrom"/>
+                </StackPanel>
+                <CheckBox Name="CheckSubfolders" Content="하위 폴더 포함" IsChecked="True"/>
+            </UniformGrid>
+        </StackPanel>
+
+        <!-- 2. 결과 목록 영역 -->
+        <DataGrid Grid.Row="1" Name="ResultGrid" x:CompileBindings="False" Margin="0,20" AutoGenerateColumns="False" IsReadOnly="False" GridLinesVisibility="All" BorderThickness="1" BorderBrush="LightGray">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="삭제선택" Binding="{Binding IsSelected}"/>
+                <DataGridTextColumn Header="파일명" Binding="{Binding FileName}" Width="2*"/>
+                <DataGridTextColumn Header="크기(MB)" Binding="{Binding SizeMB}" Width="80"/>
+                <DataGridTextColumn Header="수정일자" Binding="{Binding ModifiedDate}" Width="150"/>
+                <DataGridTextColumn Header="파일 경로" Binding="{Binding FullPath}" Width="3*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- 3. 하단 상태바 및 실행 버튼 -->
+        <DockPanel Grid.Row="2">
+            <TextBlock Name="StatusLabel" Text="준비 완료" VerticalAlignment="Center" Foreground="Gray"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                <Button Content="결과 저장(TXT)" Click="OnSaveLogClick"/>
+                <Button Content="선택 파일 격리" Click="OnQuarantineClick"/>
+                <Button Content="선택된 중복 파일 삭제" Click="OnDeleteClick" Background="#F44336" Foreground="White"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

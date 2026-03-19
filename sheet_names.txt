@@ -1,0 +1,157 @@
+FILE: 2026년 사업계획 정리.xlsx
+  환율
+  KSCE
+
+FILE: KCTR_2026년 사업계획.xlsx
+  Exchange Rate
+  Summary
+  26 Detail
+  1. Sales
+  2. Service
+  3. HR
+  4. Salary
+  5. Social Benefit
+  6. Social Benefit-2
+  7. Commucation 
+  8. Export, Import1
+  9.Transportation
+  10. Warehouse
+  11. Trip
+  12. Loan
+  13. Depreciation
+  14. Training
+  15. Test, Royalty 
+  16. non operational
+
+FILE: KSCCZ_2026년 사업계획.xlsx
+  손익계획
+  제조원가계획
+
+FILE: KSCE_2026년 사업계획.xlsx
+  변경사항
+  Work Calendar
+  EX-RATE
+  COMP
+  PL(KR)
+  MC(KR)
+  PL2026(KR)
+  PL2026(RS)
+  MC2026(KR)
+  MC2026(RS)
+  RV(KR)
+  RV(RS)
+  RV(US)
+  EV-V4목표단가(신)
+  sales2025
+  sales
+  마스터R1
+  SQ
+  PQ
+  INV
+  RMC
+  rmc(2)
+  구매팀 단가
+  Cons
+  PKG
+  Repair
+  DC
+  Comm
+  SUBm
+  Rent
+  Enter
+  TC
+  HR Benefits
+  Travel
+  Investment
+  non-op
+  HR
+  Sheet8
+
+FILE: KSCI_2026년 사업계획.xlsx
+  Report
+  수정사항
+  2026 Summary
+  DGO 2025
+  GP 2025
+  GP2 2025
+  IS DGO
+  IS 전장
+  IS KLSE
+  IS BMA
+  IS Ford
+  IS SJB
+  DGO Sales(과거자료)
+  2022 전선
+  2022 전장
+  전선Sales(2023-2028)
+  전선 OH(2023-2028)
+  전선 Salary
+  IS OO
+  IS GP2
+  DGO sales
+  DGO Salary
+  DGO Benefit
+  DOH
+  DOH Detail
+  GP sales
+  GP Salary
+  GP Benefit
+  GOH
+  GOH Detail
+  CapEx 2023
+  전선 CapEx
+  BOSK Outbound
+  GP2 Salary
+  G2OH
+  G2OH Detail
+  DGO FS
+  GP FS
+  KSGP FS
+  영업외 수지
+  SG&A
+  ATR
+  KSCI CapEx
+  DGO CapEx
+  GP CapEx
+  GP2 Capex
+  KLSE (2)
+  SKI
+  Canoo
+  Ford
+  JBox
+  SKBA
+  JBox (2)
+  TE-1 감가
+  TE-1 건물
+  TE-1 설비
+  SKBA_1
+  KLSE
+
+FILE: KSCP_2026년 사업계획.xlsx
+  환율기준
+  사업계획
+  노무비,급여(PLN)
+  임대용역(PLN)
+  기계경비(PLN)
+  운반비(PLN),통관물류(PLN)
+  인원급여리스트(PLN)
+  관세(PLN)
+  판매가,매입가
+
+FILE: KSC_2026년 사업계획.xlsx
+  1. 경신전선 요약
+  2. 손익계산서
+  3. 손익계산서 월별실적
+  4. PA요약
+  pa data(26년1월)
+  (계획)손익계산서 월별계획
+  (계획)26년 매출매입 월별계획
+  (계획)비용계획 상세_26년
+  Sheet2
+  매출추이
+  계획비1
+  전월비1
+  계획비
+  실적
+  계획
+  Sheet1

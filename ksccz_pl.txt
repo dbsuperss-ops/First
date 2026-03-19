@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 10, in <module>
+    print('\n'.join(lines)); wb.close()
+    ~~~~~^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'cp949' codec can't encode character '\u7ecf' in position 15: illegal multibyte sequence

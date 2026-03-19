@@ -1,0 +1,150 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DupeFinderPro.ViewModels"
+             x:Class="DupeFinderPro.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+
+    <ScrollViewer Padding="32 28">
+        <StackPanel Spacing="24">
+
+            <!-- ── 헤더 ──────────────────────────────────────── -->
+            <StackPanel Spacing="4">
+                <TextBlock Classes="page-title" Text="대시보드"/>
+                <TextBlock Classes="muted" Text="중복 파일 스캔 현황 요약"/>
+            </StackPanel>
+
+            <!-- ── 통계 카드 ──────────────────────────────────── -->
+            <Grid ColumnDefinitions="*,*,*,*" Height="110">
+                <Grid.Styles>
+                    <Style Selector="Border.stat-card">
+                        <Setter Property="Background"   Value="{StaticResource CardBgBrush}"/>
+                        <Setter Property="CornerRadius" Value="12"/>
+                        <Setter Property="Padding"      Value="20"/>
+                        <Setter Property="BoxShadow"    Value="0 2 8 0 #16000000"/>
+                    </Style>
+                </Grid.Styles>
+
+                <!-- 중복 그룹 -->
+                <Border Grid.Column="0" Classes="stat-card" Margin="0 0 8 0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="muted" Text="중복 그룹"/>
+                        <TextBlock Text="{Binding TotalDuplicatesFound}"
+                                   FontSize="32" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentTealBrush}"/>
+                        <TextBlock Classes="muted" Text="전체 스캔 합계"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 낭비 공간 -->
+                <Border Grid.Column="1" Classes="stat-card" Margin="4 0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="muted" Text="낭비 공간"/>
+                        <TextBlock Text="{Binding TotalWastedFormatted}"
+                                   FontSize="32" FontWeight="Bold"
+                                   Foreground="{StaticResource StatusOrangeBrush}"/>
+                        <TextBlock Classes="muted" Text="회수 가능"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 총 스캔 수 -->
+                <Border Grid.Column="2" Classes="stat-card" Margin="4 0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="muted" Text="총 스캔 수"/>
+                        <TextBlock Text="{Binding TotalScansRun}"
+                                   FontSize="32" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Classes="muted" Text="회 스캔 완료"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 마지막 스캔 -->
+                <Border Grid.Column="3" Classes="stat-card" Margin="8 0 0 0">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="muted" Text="마지막 스캔"/>
+                        <TextBlock Text="{Binding LastScanTime}"
+                                   FontSize="18" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ── 빠른 작업 ──────────────────────────────── -->
+            <Border Classes="card">
+                <StackPanel Spacing="16">
+                    <TextBlock Classes="section-title" Text="빠른 작업"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Classes="primary"
+                                Content="새 스캔 시작"
+                                Command="{Binding StartNewScanCommand}"/>
+                        <Button Classes="secondary"
+                                Content="스캔 기록 보기"
+                                Command="{Binding ViewHistoryCommand}"/>
+                        <Button Classes="secondary"
+                                Content="결과 보기"
+                                IsEnabled="{Binding HasRecentScan}"
+                                Command="{Binding ViewResultsCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 최근 스캔 요약 ─────────────────────────── -->
+            <Border Classes="card" IsVisible="{Binding HasRecentScan}">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="최근 스캔"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="label" Text="{Binding RecentScanName}"/>
+                            <TextBlock Classes="muted" Text="{Binding RecentScanSummary}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="badge-green" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding RecentScanStatus}"
+                                       Foreground="{StaticResource StatusGreenBrush}"
+                                       FontSize="12" FontWeight="SemiBold"/>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 최근 스캔 목록 ────────────────────────── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="최근 스캔 목록"/>
+                    <ItemsControl ItemsSource="{Binding RecentJobs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ScanJobSummaryViewModel">
+                                <Border Padding="0 8" BorderThickness="0 0 0 1"
+                                        BorderBrush="{StaticResource BorderBrush}">
+                                    <Grid ColumnDefinitions="*,Auto,120">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Classes="label" Text="{Binding Name}"/>
+                                            <TextBlock Classes="muted" Text="{Binding Summary}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Classes="muted"
+                                                   Text="{Binding CreatedAt}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12 0"/>
+                                        <Border Grid.Column="2" VerticalAlignment="Center"
+                                                CornerRadius="12" Padding="8 3"
+                                                HorizontalAlignment="Right">
+                                            <Border.Background>
+                                                <MultiBinding>
+                                                    <Binding Path="IsCompleted"/>
+                                                </MultiBinding>
+                                            </Border.Background>
+                                            <TextBlock Text="{Binding Status}"
+                                                       FontSize="12" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="muted" Text="스캔 기록이 없습니다."
+                               IsVisible="{Binding !RecentJobs.Count}"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

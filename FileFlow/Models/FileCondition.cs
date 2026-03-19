@@ -1,0 +1,1 @@
+namespace FileFlow.Models { public class FileCondition { public string Type { get; set; } = ""; public string Operator { get; set; } = ""; public string Value { get; set; } = ""; public string Unit { get; set; } = ""; } }
