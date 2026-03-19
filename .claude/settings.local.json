@@ -18,7 +18,14 @@
       "Bash(apt-get install -y python3-pip python3-pandas python3-openpyxl)",
       "Bash(sudo apt-get update)",
       "Bash(sudo apt-get install -y python3-pip python3-pandas python3-openpyxl)",
-      "Bash(python3 -c \"import zipfile; print(''zipfile available'')\")"
+      "Bash(python3 -c \"import zipfile; print(''zipfile available'')\")",
+      "Bash(python engine.py /home/gabriel/first/files 2026)",
+      "Bash(python3 engine.py /home/gabriel/first/files 2026)",
+      "Bash(pip3 install openpyxl)",
+      "Bash(python3 -m pip install openpyxl)",
+      "Bash(sudo apt-get install -y python3-pip python3-openpyxl)",
+      "Bash(curl https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py)",
+      "Bash(python3 /tmp/get-pip.py --user)"
     ]
   }
 }

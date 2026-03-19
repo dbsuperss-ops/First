@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>월별 추이 그래프</title>
+</head>
+<body>
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+        const salesData = {
+            'KCTR': [3741242710, 4668896370, 6645845524, 5543907951, 5072989070, 7729646650, 4731807556, 7045405952, 6362025655, 9346540266, 6623507399, 6737261365],
+            'KSCCZ': [6215153118, 4847313412, 7087748644, 6975268772, 5653368953, 6564737011, 6812880457, 5165029268, 6827978221, 5719345586, 6550820062, 7119053329],
+            'KSCE': [42079394700, 49108665900, 57591604000, 53037762750, 54966429000, 57694054250, 44407364750, 38212346550, 60600089754, 69629764567, 69091739787, 76258799650]
+        };
+
+        const profitData = {
+            'KCTR': [434477322, 568856653, 949362319, 686541635, 595411817, 1040919421, 574180989, 981640990, 854295857, 789237933, 297016928, 228436258],
+            'KSCCZ': [417120551, 175755851, 405411719, 520786621, 330350325, 355737766, 556991239, 213386222, 372228873, 284167510, 448423237, 386141729],
+            'KSCE': [-10820925744, -7692980111, -5492799358, -7140707726, -6254153748, -11776820608, -4583630655, -6120488556, 1184509178, 4945917230, 5033044720, -1168685449]
+        };
+
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('사업장별 월별 매출 추이 (2026년)', canvas.width / 2, 80);
+
+        const chartX = 150;
+        const chartY = 150;
+        const chartWidth = 1620;
+        const chartHeight = 800;
+
+        const allSales = Object.values(salesData).flat();
+        const maxValue = Math.max(...allSales);
+        const minValue = 0;
+
+        ctx.strokeStyle = '#E5E7EB';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+            const y = chartY + (chartHeight / 5) * i;
+            ctx.beginPath();
+            ctx.moveTo(chartX, y);
+            ctx.lineTo(chartX + chartWidth, y);
+            ctx.stroke();
+
+            const value = maxValue - (maxValue / 5) * i;
+            ctx.fillStyle = '#666666';
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(Math.round(value / 100000000) + '억', chartX - 15, y + 5);
+        }
+
+        months.forEach((month, i) => {
+            const x = chartX + (chartWidth / (months.length - 1)) * i;
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(month, x, chartY + chartHeight + 40);
+        });
+
+        const colors = {
+            'KCTR': '#3B82F6',
+            'KSCCZ': '#10B981',
+            'KSCE': '#EF4444'
+        };
+
+        Object.keys(salesData).forEach(corp => {
+            ctx.strokeStyle = colors[corp];
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+
+            salesData[corp].forEach((value, i) => {
+                const x = chartX + (chartWidth / (months.length - 1)) * i;
+                const y = chartY + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+
+                ctx.fillStyle = colors[corp];
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.strokeStyle = colors[corp];
+                ctx.lineWidth = 4;
+            });
+
+            ctx.stroke();
+        });
+
+        const legendY = chartY + chartHeight + 80;
+        const legendItems = [
+            { corp: 'KCTR', color: colors.KCTR },
+            { corp: 'KSCCZ', color: colors.KSCCZ },
+            { corp: 'KSCE', color: colors.KSCE }
+        ];
+
+        legendItems.forEach((item, i) => {
+            const x = canvas.width / 2 - 200 + i * 200;
+
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(x, legendY);
+            ctx.lineTo(x + 60, legendY);
+            ctx.stroke();
+
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(x + 30, legendY, 6, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(item.corp, x + 70, legendY + 8);
+        });
+
+        canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chart4_monthly_trend.png';
+            a.click();
+        });
+    </script>
+</body>
+</html>
