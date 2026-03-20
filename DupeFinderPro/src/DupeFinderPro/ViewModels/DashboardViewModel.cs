@@ -1,14 +1,17 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DupeFinderPro.Application;
+using DupeFinderPro.Domain.Interfaces;
 using DupeFinderPro.Domain.Models;
 using System.Collections.ObjectModel;
+using System.IO;
 
 namespace DupeFinderPro.ViewModels;
 
 public sealed partial class DashboardViewModel : ViewModelBase
 {
     private readonly ScanJobService _scanJobService;
+    private readonly IFileOperationService _fileOps;
 
     public event Action? NavigateToNewScan;
     public event Action? NavigateToHistory;
@@ -23,13 +26,20 @@ public sealed partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private string _recentScanStatus = string.Empty;
     [ObservableProperty] private string _recentScanSummary = string.Empty;
 
+    // ── 빈 폴더 삭제 ─────────────────────────────────────────────────
+    [ObservableProperty] private string _emptyFolderRoot = string.Empty;
+    [ObservableProperty] private bool _isDeletingEmptyFolders;
+    [ObservableProperty] private string _emptyFolderResult = string.Empty;
+    [ObservableProperty] private bool _hasEmptyFolderResult;
+
     public ObservableCollection<ScanJobSummaryViewModel> RecentJobs { get; } = [];
 
     public string TotalWastedFormatted => FormatBytes(TotalWastedBytes);
 
-    public DashboardViewModel(ScanJobService scanJobService)
+    public DashboardViewModel(ScanJobService scanJobService, IFileOperationService fileOps)
     {
         _scanJobService = scanJobService;
+        _fileOps = fileOps;
     }
 
     [RelayCommand]
@@ -40,6 +50,35 @@ public sealed partial class DashboardViewModel : ViewModelBase
 
     [RelayCommand]
     private void ViewResults() => NavigateToResults?.Invoke();
+
+    [RelayCommand]
+    private async Task DeleteEmptyFolders()
+    {
+        var root = EmptyFolderRoot.Trim();
+        if (string.IsNullOrEmpty(root) || !Directory.Exists(root))
+        {
+            EmptyFolderResult = "유효한 폴더 경로를 입력하세요.";
+            HasEmptyFolderResult = true;
+            return;
+        }
+
+        IsDeletingEmptyFolders = true;
+        HasEmptyFolderResult = false;
+        try
+        {
+            var count = await _fileOps.DeleteEmptyFoldersAsync(root);
+            EmptyFolderResult = count == 0 ? "빈 폴더가 없습니다." : $"{count}개의 빈 폴더를 삭제했습니다.";
+        }
+        catch (Exception ex)
+        {
+            EmptyFolderResult = $"오류: {ex.Message}";
+        }
+        finally
+        {
+            IsDeletingEmptyFolders = false;
+            HasEmptyFolderResult = true;
+        }
+    }
 
     public void Refresh()
     {

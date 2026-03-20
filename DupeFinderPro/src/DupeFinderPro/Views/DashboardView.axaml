@@ -88,6 +88,32 @@
                 </StackPanel>
             </Border>
 
+            <!-- ── 빈 폴더 삭제 ────────────────────────── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="빈 폴더 삭제"/>
+                    <TextBlock Classes="muted" Text="선택한 폴더 내 모든 빈 폴더를 재귀적으로 삭제합니다."/>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Classes="input"
+                                 Text="{Binding EmptyFolderRoot}"
+                                 Watermark="예: C:\Users\사용자\문서"/>
+                        <Button Grid.Column="1" Classes="secondary"
+                                Content="📁"
+                                ToolTip.Tip="폴더 선택"
+                                Click="BrowseEmptyFolderRoot_Click"/>
+                        <Button Grid.Column="2" Classes="danger"
+                                Content="빈 폴더 삭제"
+                                Command="{Binding DeleteEmptyFoldersCommand}"
+                                IsEnabled="{Binding !IsDeletingEmptyFolders}"/>
+                    </Grid>
+                    <Border Background="#FFF5F5" CornerRadius="6" Padding="10 8"
+                            IsVisible="{Binding HasEmptyFolderResult}">
+                        <TextBlock Foreground="{StaticResource StatusRedBrush}"
+                                   Text="{Binding EmptyFolderResult}"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
             <!-- ── 최근 스캔 요약 ─────────────────────────── -->
             <Border Classes="card" IsVisible="{Binding HasRecentScan}">
                 <StackPanel Spacing="12">

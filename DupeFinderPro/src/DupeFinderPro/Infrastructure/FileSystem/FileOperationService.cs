@@ -47,4 +47,40 @@ public sealed class FileOperationService : IFileOperationService
             return true;
         }, ct);
     }
+
+    public Task<int> DeleteEmptyFoldersAsync(string rootPath, CancellationToken ct = default)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (!Directory.Exists(rootPath))
+                return 0;
+
+            return DeleteEmptyRecursive(rootPath, ct);
+        }, ct);
+    }
+
+    private static int DeleteEmptyRecursive(string path, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        int count = 0;
+        try
+        {
+            foreach (var sub in Directory.GetDirectories(path))
+                count += DeleteEmptyRecursive(sub, ct);
+
+            // Delete if now empty (no files, no subdirectories)
+            if (Directory.GetFiles(path).Length == 0 &&
+                Directory.GetDirectories(path).Length == 0)
+            {
+                Directory.Delete(path);
+                count++;
+            }
+        }
+        catch { /* skip inaccessible or already-deleted folders */ }
+
+        return count;
+    }
 }
