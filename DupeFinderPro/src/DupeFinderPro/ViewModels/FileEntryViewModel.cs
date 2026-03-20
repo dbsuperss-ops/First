@@ -75,11 +75,11 @@ public sealed partial class FileEntryViewModel : ObservableObject
                     break;
             }
             IsDone = true;
-            StatusMessage = "Done";
+            StatusMessage = "완료";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error: {ex.Message}";
+            StatusMessage = $"오류: {ex.Message}";
         }
         finally
         {

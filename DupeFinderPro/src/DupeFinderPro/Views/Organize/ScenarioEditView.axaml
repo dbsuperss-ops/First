@@ -148,6 +148,7 @@
                                                             <x:Static Member="models:ConditionOperator.DoesNotContain"/>
                                                             <x:Static Member="models:ConditionOperator.StartsWith"/>
                                                             <x:Static Member="models:ConditionOperator.EndsWith"/>
+                                                            <x:Static Member="models:ConditionOperator.Regex"/>
                                                             <x:Static Member="models:ConditionOperator.GreaterThan"/>
                                                             <x:Static Member="models:ConditionOperator.LessThan"/>
                                                             <x:Static Member="models:ConditionOperator.Year"/>

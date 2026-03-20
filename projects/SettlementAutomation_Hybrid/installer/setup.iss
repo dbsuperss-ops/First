@@ -3,6 +3,7 @@
 #define MyAppPublisher "KSC"
 #define MyAppExeName   "SettlementUI.exe"
 #define MyStaging      "..\installer\staging"
+#define MyAppIcon      "chart.ico"
 
 [Setup]
 AppId={{A3F2B8C1-7D4E-4F9A-B2C3-1E5D6F7A8B9C}
@@ -14,6 +15,8 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=output
 OutputBaseFilename=KSCRefinerSetup
+SetupIconFile={#MyAppIcon}
+UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -35,9 +38,9 @@ Source: "{#MyStaging}\SettlementUI.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyStaging}\ksc_refiner\*"; DestDir: "{app}\ksc_refiner"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent

@@ -13,13 +13,13 @@ public sealed partial class ScanHistoryViewModel : ViewModelBase
     public event Action<ScanJob>? ViewResultsRequested;
 
     [ObservableProperty] private string _searchText = string.Empty;
-    [ObservableProperty] private string _selectedStatusFilter = "All";
+    [ObservableProperty] private string _selectedStatusFilter = "전체";
     [ObservableProperty] private ScanHistoryItemViewModel? _selectedItem;
 
     public ObservableCollection<ScanHistoryItemViewModel> Items { get; } = [];
 
     public static IReadOnlyList<string> StatusFilters { get; } =
-        ["All", "Completed", "Running", "Cancelled", "Failed"];
+        ["전체", "완료", "실행 중", "취소됨", "실패"];
 
     public ScanHistoryViewModel(ScanJobService scanJobService)
     {
