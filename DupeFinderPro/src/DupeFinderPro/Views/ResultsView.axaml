@@ -168,7 +168,7 @@
                                                 Command="{Binding AutoSelectCommand}"
                                                 Padding="10 4" Margin="0 0 8 0"/>
                                         <TextBlock Grid.Column="4"
-                                                   Text="{Binding IsExpanded, StringFormat='{}▼ {0:▲}'}"
+                                                   Text="{Binding ExpandIcon}"
                                                    VerticalAlignment="Center"
                                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                                     </Grid>

@@ -58,7 +58,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
         HasScanError = false;
         ErrorMessage = string.Empty;
         Groups.Clear();
-        PhaseLabel = "Preparing…";
+        PhaseLabel = "준비 중…";
         CurrentFile = string.Empty;
         ProgressValue = 0;
         IsIndeterminate = true;
@@ -82,7 +82,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
         else if (job.Status == ScanJobStatus.Failed)
         {
             HasScanError = true;
-            ErrorMessage = job.ErrorMessage ?? "Unknown error.";
+            ErrorMessage = job.ErrorMessage ?? "알 수 없는 오류";
         }
     }
 
@@ -90,10 +90,10 @@ public sealed partial class ResultsViewModel : ViewModelBase
     {
         PhaseLabel = p.Phase switch
         {
-            ScanPhase.Collecting     => "Collecting files…",
-            ScanPhase.PartialHashing => $"Quick-hashing… ({p.ProcessedCount}/{p.TotalCount})",
-            ScanPhase.FullHashing    => $"Full-hashing… ({p.ProcessedCount}/{p.TotalCount})",
-            ScanPhase.Completed      => "Finished",
+            ScanPhase.Collecting     => "파일 수집 중…",
+            ScanPhase.PartialHashing => $"빠른 해시 중… ({p.ProcessedCount}/{p.TotalCount})",
+            ScanPhase.FullHashing    => $"전체 해시 중… ({p.ProcessedCount}/{p.TotalCount})",
+            ScanPhase.Completed      => "완료",
             _                        => string.Empty
         };
 

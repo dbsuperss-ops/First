@@ -46,7 +46,7 @@ public sealed partial class MainWindowViewModel : ViewModelBase
         // Wire up cross-VM navigation
         _newScanVm.ScanStarted += OnScanStarted;
         _dashboardVm.NavigateToNewScan   += () => NavigateTo(AppPage.NewScan);
-        _dashboardVm.NavigateToHistory   += () => NavigateTo(AppPage.ScanHistory);
+        _dashboardVm.NavigateToHistory   += () => { _historyVm.Refresh(); NavigateTo(AppPage.ScanHistory); };
         _dashboardVm.NavigateToResults   += () => NavigateTo(AppPage.Results);
         _dashboardVm.NavigateToScenarios += () => NavigateTo(AppPage.ScenarioList);
         _dashboardVm.NavigateToOrganize  += () =>
@@ -72,7 +72,11 @@ public sealed partial class MainWindowViewModel : ViewModelBase
     private void NavigateToNewScan() => NavigateTo(AppPage.NewScan);
 
     [RelayCommand]
-    private void NavigateToHistory() => NavigateTo(AppPage.ScanHistory);
+    private void NavigateToHistory()
+    {
+        _historyVm.Refresh();
+        NavigateTo(AppPage.ScanHistory);
+    }
 
     [RelayCommand]
     private void NavigateToResults() => NavigateTo(AppPage.Results);
