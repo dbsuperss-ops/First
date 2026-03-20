@@ -152,6 +152,14 @@
             <Setter Property="Foreground"      Value="{StaticResource TextPrimaryBrush}"/>
         </Style>
 
+        <!-- ── Stat card ─────────────────────────────────────────── -->
+        <Style Selector="Border.stat-card">
+            <Setter Property="Background"   Value="{StaticResource CardBgBrush}"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding"      Value="20"/>
+            <Setter Property="BoxShadow"    Value="0 2 8 0 #16000000"/>
+        </Style>
+
         <!-- ── Separator ──────────────────────────────────────────── -->
         <Style Selector="Separator">
             <Setter Property="Background"  Value="{StaticResource BorderBrush}"/>

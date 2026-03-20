@@ -73,6 +73,49 @@
                             <TextBlock Text="결과" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+
+                    <!-- Separator -->
+                    <Border Height="1" Background="{StaticResource BorderBrush}" Margin="8 8"/>
+
+                    <!-- Scenarios -->
+                    <Button Classes="nav-item"
+                            Classes.active="{Binding IsScenarioListActive}"
+                            Command="{Binding NavigateToScenarioListCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="☰" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="시나리오" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Organize -->
+                    <Button Classes="nav-item"
+                            Classes.active="{Binding IsOrganizeActive}"
+                            Command="{Binding NavigateToOrganizeCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="▤" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="파일 정리" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Organize Log -->
+                    <Button Classes="nav-item"
+                            Classes.active="{Binding IsOrganizeLogActive}"
+                            Command="{Binding NavigateToOrganizeLogCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="◷" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="정리 기록" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Organize Stats -->
+                    <Button Classes="nav-item"
+                            Classes.active="{Binding IsOrganizeStatsActive}"
+                            Command="{Binding NavigateToOrganizeStatsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="▦" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="정리 통계" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <!-- Spacer -->

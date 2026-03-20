@@ -4,7 +4,7 @@ from dataclasses import dataclass, asdict
 from typing import Optional
 
 MASTER_COLUMNS = [
-    "귀속연월", "법인코드", "대분류", "중분류", "계정과목",
+    "귀속연월", "법인코드", "구분", "대분류", "중분류", "계정과목",
     "현지통화", "현지금액", "적용환율", "KRW금액"
 ]
 
@@ -15,6 +15,7 @@ CATEGORY_MC = "MC"
 class AccountRow:
     귀속연월: str
     법인코드: str
+    구분: str
     대분류: str
     중분류: str
     계정과목: str
@@ -25,7 +26,7 @@ class AccountRow:
 
     def to_list(self):
         return [
-            self.귀속연월, self.법인코드, self.대분류, self.중분류,
+            self.귀속연월, self.법인코드, self.구분, self.대분류, self.중분류,
             self.계정과목, self.현지통화, self.현지금액, self.적용환율, self.KRW금액
         ]
 
@@ -50,7 +51,7 @@ def safe_float(val) -> float:
 
 def detect_company(filename: str) -> Optional[str]:
     name = filename.upper()
-    for code in ["KSCP", "KSCCZ", "KSCE", "KSCI", "KCTR"]:
+    for code in ["KSCP", "KSCCZ", "KSCE", "KSCI", "KCTR", "KSC"]:
         if code in name:
             return code
     return None

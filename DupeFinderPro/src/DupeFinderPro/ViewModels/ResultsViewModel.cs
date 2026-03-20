@@ -139,6 +139,37 @@ public sealed partial class ResultsViewModel : ViewModelBase
             g.AutoSelectCommand.Execute(null);
     }
 
+    // ── 일괄 작업 설정 ─────────────────────────────────────────────────
+    /// <summary>Keep 파일을 제외한 모든 파일을 삭제로 설정합니다.</summary>
+    [RelayCommand]
+    private void SetAllDelete()
+    {
+        foreach (var g in Groups)
+            foreach (var f in g.Files)
+                if (!f.IsDone && f.SelectedAction != FileAction.Keep)
+                    f.SelectedAction = FileAction.Delete;
+    }
+
+    /// <summary>Keep 파일을 제외한 모든 파일을 격리로 설정합니다.</summary>
+    [RelayCommand]
+    private void SetAllQuarantine()
+    {
+        foreach (var g in Groups)
+            foreach (var f in g.Files)
+                if (!f.IsDone && f.SelectedAction != FileAction.Keep)
+                    f.SelectedAction = FileAction.Quarantine;
+    }
+
+    /// <summary>Keep 파일을 제외한 모든 파일을 이동으로 설정합니다.</summary>
+    [RelayCommand]
+    private void SetAllMove()
+    {
+        foreach (var g in Groups)
+            foreach (var f in g.Files)
+                if (!f.IsDone && f.SelectedAction != FileAction.Keep)
+                    f.SelectedAction = FileAction.MoveToFolder;
+    }
+
     [RelayCommand]
     private async Task ApplyAllAsync()
     {

@@ -17,6 +17,7 @@ from parsers.kctr_parser import KctrParser
 from parsers.ksccz_parser import KscczParser
 from parsers.ksce_parser import KsceParser
 from parsers.ksci_parser import KsciParser
+from parsers.ksc_parser import KscParser
 
 PARSER_MAP = {
     "KSCP":  KscpParser,
@@ -24,6 +25,7 @@ PARSER_MAP = {
     "KSCCZ": KscczParser,
     "KSCE":  KsceParser,
     "KSCI":  KsciParser,
+    "KSC":   KscParser,
 }
 
 def find_excel_files(input_dir: str, year: str = None) -> list:
@@ -100,27 +102,35 @@ def write_consolidated(all_rows: list, output_path: str):
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
             cell.border = thin_border
             cell.font = Font(name="Arial", size=10)
-            if col_idx == 7:
+            if col_idx == 8:
                 cell.number_format = num_fmt_local
-            elif col_idx == 8:
-                cell.number_format = num_fmt_rate
             elif col_idx == 9:
+                cell.number_format = num_fmt_rate
+            elif col_idx == 10:
                 cell.number_format = num_fmt_krw
 
-    col_widths = [12, 10, 6, 10, 16, 8, 18, 10, 18]
+    col_widths = [12, 10, 6, 6, 10, 16, 8, 18, 10, 18]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
     ws.auto_filter.ref = ws.dimensions
     ws.freeze_panes = "A2"
 
-    summary = _create_summary(wb, all_rows)
-    _create_executive_report(wb, all_rows)
+    actual_rows = [r for r in all_rows if r.구분 == "실적"]
+    plan_rows = [r for r in all_rows if r.구분 == "계획"]
+
+    _create_summary(wb, actual_rows)
+    _create_executive_report(wb, actual_rows)
+    if plan_rows:
+        _create_plan_summary(wb, plan_rows)
 
     wb.save(output_path)
     print(f"\n📊 통합 DB 저장: {output_path}")
-    print(f"   총 {len(all_rows)}건, {len(set(r.법인코드 for r in all_rows))}개 법인")
-    print(f"   포함 시트: 통합_DB, 법인별_요약, 경영보고서")
+    print(f"   총 {len(all_rows)}건 (실적 {len(actual_rows)}건 / 계획 {len(plan_rows)}건), {len(set(r.법인코드 for r in all_rows))}개 법인")
+    sheets = "통합_DB, 법인별_요약, 경영보고서"
+    if plan_rows:
+        sheets += ", 사업계획_요약"
+    print(f"   포함 시트: {sheets}")
 
 def _create_summary(wb, all_rows):
     ws = wb.create_sheet("법인별_요약")
@@ -318,6 +328,60 @@ def _create_executive_report(wb, all_rows):
     ws.freeze_panes = "C5"
     ws.sheet_properties.tabColor = "2F5496"
 
+def _create_plan_summary(wb, plan_rows):
+    ws = wb.create_sheet("사업계획_요약")
+
+    companies = sorted(set(r.법인코드 for r in plan_rows))
+    periods = sorted(set(r.귀속연월 for r in plan_rows))
+
+    key_accounts = ["매출액", "매출원가", "매출총이익", "판관비계", "영업이익"]
+
+    header_font = Font(name="Arial", bold=True, color="FFFFFF", size=10)
+    header_fill = PatternFill("solid", fgColor="375623")  # 녹색 계열 (계획 구분)
+    thin_border = Border(
+        left=Side(style="thin", color="D9D9D9"),
+        right=Side(style="thin", color="D9D9D9"),
+        top=Side(style="thin", color="D9D9D9"),
+        bottom=Side(style="thin", color="D9D9D9"),
+    )
+
+    headers = ["귀속연월", "계정과목"] + companies + ["합계"]
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    row_idx = 2
+    for period in periods:
+        for account in key_accounts:
+            ws.cell(row=row_idx, column=1, value=period)
+            ws.cell(row=row_idx, column=2, value=account)
+
+            total = 0
+            for comp_idx, comp in enumerate(companies, 3):
+                val = sum(
+                    r.KRW금액 for r in plan_rows
+                    if r.귀속연월 == period and r.법인코드 == comp and r.계정과목 == account
+                )
+                cell = ws.cell(row=row_idx, column=comp_idx, value=val)
+                cell.number_format = '#,##0'
+                cell.border = thin_border
+                total += val
+
+            total_cell = ws.cell(row=row_idx, column=len(companies) + 3, value=total)
+            total_cell.number_format = '#,##0'
+            total_cell.border = thin_border
+            row_idx += 1
+
+    for i, w in enumerate([12, 14] + [16] * (len(companies) + 1), 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    ws.freeze_panes = "C2"
+    ws.sheet_properties.tabColor = "375623"
+    return ws
+
+
 def load_settings(config_dir: str = None) -> dict:
     if config_dir is None:
         config_dir = os.path.join(os.path.dirname(__file__), "config")
@@ -335,21 +399,54 @@ def save_settings(settings: dict, config_dir: str = None):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=2)
 
+def _get_base_dir() -> str:
+    """Returns the install directory where config/ lives (may be read-only).
+    In a PyInstaller --onedir bundle, config/ is next to engine.exe."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+def _get_user_config_dir() -> str:
+    # Returns a user-writable config dir: %APPDATA%/KSC Refiner/
+    appdata = os.environ.get("APPDATA") or os.path.expanduser("~")
+    return os.path.join(appdata, "KSC Refiner")
+
+
 def main(input_dir: str = None, output_dir: str = None, year: str = "2026"):
-    config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
-    settings = load_settings(config_dir)
+    install_config = os.path.join(_get_base_dir(), "config")
+    user_config = _get_user_config_dir()
+    os.makedirs(user_config, exist_ok=True)
+
+    # Copy rates.json to user config on first run so user edits persist
+    user_rates = os.path.join(user_config, "rates.json")
+    install_rates = os.path.join(install_config, "rates.json")
+    if not os.path.exists(user_rates) and os.path.exists(install_rates):
+        import shutil
+        shutil.copy2(install_rates, user_rates)
+
+    # settings.json is always read/written in user config (writable)
+    settings = load_settings(user_config)
 
     if input_dir is None:
         input_dir = settings.get("root_path", os.path.join(os.path.dirname(__file__), "..", "input"))
     if output_dir is None:
-        output_dir = settings.get("output_path", os.path.join(os.path.dirname(__file__), "output"))
+        saved = settings.get("output_path", "")
+        # 저장된 경로가 같은 루트 하위이거나 비어 있으면 input 옆 output 폴더 사용
+        if saved and os.path.splitdrive(saved)[0].lower() == os.path.splitdrive(input_dir)[0].lower():
+            try:
+                os.makedirs(saved, exist_ok=True)
+                output_dir = saved
+            except (PermissionError, OSError):
+                output_dir = os.path.join(input_dir, "output")
+        else:
+            output_dir = os.path.join(input_dir, "output")
 
     os.makedirs(output_dir, exist_ok=True)
 
     settings["root_path"] = input_dir
     settings["output_path"] = output_dir
     settings["last_year"] = year
-    save_settings(settings, config_dir)
+    save_settings(settings, user_config)
 
     print("=" * 60)
     print("🚀 KSC Settlement Refiner Engine v1.2")
@@ -358,7 +455,9 @@ def main(input_dir: str = None, output_dir: str = None, year: str = "2026"):
     print(f"   처리 범위: {year}년 전체 누적")
     print("=" * 60)
 
-    rates = load_rates(year, config_dir)
+    # Load rates from user config (writable), fall back to install config
+    rates_config = user_config if os.path.exists(user_rates) else install_config
+    rates = load_rates(year, rates_config)
     print(f"\n📌 적용 환율: {rates}")
 
     files = find_excel_files(input_dir, year)
