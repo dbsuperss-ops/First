@@ -93,7 +93,7 @@ class KscpParser(BaseParser):
             ym = f"{year}-{month_num:02d}"
             for row_num, (cat, sub, account) in KSCP_PLAN_MAP.items():
                 val = safe_float(ws.cell(row=row_num, column=col).value)
-                rows.append(self.make_row(ym, "KSCP", cat, sub, account, "KRW", val))
+                rows.append(self.make_row(ym, "KSCP", cat, sub, account, "KRW", val, 구분="계획"))
         return rows
 
     def _detect_year_plan(self, ws) -> str:

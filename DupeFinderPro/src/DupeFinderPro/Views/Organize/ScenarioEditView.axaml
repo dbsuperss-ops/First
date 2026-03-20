@@ -1,0 +1,194 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DupeFinderPro.ViewModels.Organize"
+             xmlns:models="using:DupeFinderPro.Domain.Models.Organize"
+             x:Class="DupeFinderPro.Views.Organize.ScenarioEditView"
+             x:DataType="vm:ScenarioEditViewModel">
+
+    <ScrollViewer Padding="32 28">
+        <StackPanel Spacing="20" MaxWidth="800">
+
+            <StackPanel Spacing="4">
+                <TextBlock Classes="page-title" Text="시나리오 편집"/>
+                <TextBlock Classes="muted" Text="분류 규칙과 일정을 설정합니다."/>
+            </StackPanel>
+
+            <!-- Validation error -->
+            <Border Background="#FFF5F5" CornerRadius="6" Padding="12 8"
+                    IsVisible="{Binding HasValidationError}">
+                <TextBlock Foreground="{StaticResource StatusRedBrush}"
+                           Text="{Binding ValidationError}"/>
+            </Border>
+
+            <!-- Basic info -->
+            <Border Classes="card">
+                <StackPanel Spacing="16">
+                    <TextBlock Classes="section-title" Text="기본 정보"/>
+                    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" VerticalAlignment="Center" Text="이름"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Classes="input"
+                                 Text="{Binding Name}" Watermark="시나리오 이름"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" VerticalAlignment="Center" Text="원본 폴더"/>
+                        <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Classes="input"
+                                     Text="{Binding SourceFolder}" Watermark="C:\Users\..."/>
+                            <Button Grid.Column="1" Classes="secondary" Content="📁"
+                                    ToolTip.Tip="폴더 선택"
+                                    Click="BrowseSourceFolder_Click"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" VerticalAlignment="Center" Text="대상 폴더"/>
+                        <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Classes="input"
+                                     Text="{Binding TargetFolder}" Watermark="C:\Users\..."/>
+                            <Button Grid.Column="1" Classes="secondary" Content="📁"
+                                    ToolTip.Tip="폴더 선택"
+                                    Click="BrowseTargetFolder_Click"/>
+                        </Grid>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" VerticalAlignment="Center" Text="충돌 처리"/>
+                        <ComboBox Grid.Row="3" Grid.Column="1"
+                                  SelectedItem="{Binding ConflictMode}"
+                                  HorizontalAlignment="Left" MinWidth="160">
+                            <x:Static Member="models:ConflictMode.Rename"/>
+                            <x:Static Member="models:ConflictMode.Skip"/>
+                            <x:Static Member="models:ConflictMode.Overwrite"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="24">
+                        <CheckBox Content="활성화" IsChecked="{Binding IsActive}"/>
+                        <CheckBox Content="하위 폴더 포함" IsChecked="{Binding IncludeSubfolders}"/>
+                        <CheckBox Content="시스템 파일 제외" IsChecked="{Binding ExcludeSystemFiles}"/>
+                        <CheckBox Content="빈 폴더 정리" IsChecked="{Binding CleanupEmptyFolders}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Schedule -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="예약 실행"/>
+                    <CheckBox Content="정기 실행 예약" IsChecked="{Binding IsScheduled}"/>
+                    <StackPanel Spacing="12" IsVisible="{Binding IsScheduled}">
+                        <Grid ColumnDefinitions="120,200" ColumnSpacing="12">
+                            <TextBlock Grid.Column="0" Classes="label" VerticalAlignment="Center" Text="실행 시각"/>
+                            <TextBox Grid.Column="1" Classes="input"
+                                     Text="{Binding ScheduleTime}" Watermark="09:00"/>
+                        </Grid>
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="label" Text="실행 요일"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <CheckBox Content="월" IsChecked="{Binding IsMon}"/>
+                                <CheckBox Content="화" IsChecked="{Binding IsTue}"/>
+                                <CheckBox Content="수" IsChecked="{Binding IsWed}"/>
+                                <CheckBox Content="목" IsChecked="{Binding IsThu}"/>
+                                <CheckBox Content="금" IsChecked="{Binding IsFri}"/>
+                                <CheckBox Content="토" IsChecked="{Binding IsSat}"/>
+                                <CheckBox Content="일" IsChecked="{Binding IsSun}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Rules -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="section-title" Text="분류 규칙"/>
+                        <Button Grid.Column="1" Classes="secondary" Content="+ 규칙 추가"
+                                Command="{Binding AddRuleCommand}"/>
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding Rules}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ClassifyRuleViewModel">
+                                <Border Classes="card" Margin="0 4" Padding="12">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBox Grid.Column="0" Classes="input"
+                                                     Text="{Binding RuleName}"
+                                                     Watermark="규칙 이름"/>
+                                            <Button Grid.Column="1" Classes="danger" Content="삭제"
+                                                    Margin="8 0 0 0"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.RemoveRuleCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                        </Grid>
+
+                                        <Grid ColumnDefinitions="100,160,100,*" ColumnSpacing="8">
+                                            <TextBlock Grid.Column="0" Classes="label" VerticalAlignment="Center" Text="조건 논리"/>
+                                            <ComboBox Grid.Column="1" SelectedItem="{Binding Logic}">
+                                                <x:Static Member="models:ConditionLogic.Or"/>
+                                                <x:Static Member="models:ConditionLogic.And"/>
+                                            </ComboBox>
+                                            <TextBlock Grid.Column="2" Classes="label" VerticalAlignment="Center" Text="대상 경로"/>
+                                            <TextBox Grid.Column="3" Classes="input"
+                                                     Text="{Binding TargetPath}"
+                                                     Watermark="{}{ext}/{year}/{month}"/>
+                                        </Grid>
+
+                                        <!-- Conditions -->
+                                        <ItemsControl ItemsSource="{Binding Conditions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:FileConditionViewModel">
+                                                    <Grid ColumnDefinitions="130,140,*,80,36"
+                                                          ColumnSpacing="8" Margin="0 4">
+                                                        <ComboBox Grid.Column="0" SelectedItem="{Binding Type}">
+                                                            <x:Static Member="models:ConditionType.Extension"/>
+                                                            <x:Static Member="models:ConditionType.Keyword"/>
+                                                            <x:Static Member="models:ConditionType.Size"/>
+                                                            <x:Static Member="models:ConditionType.Date"/>
+                                                        </ComboBox>
+                                                        <ComboBox Grid.Column="1" SelectedItem="{Binding Operator}">
+                                                            <x:Static Member="models:ConditionOperator.Equals"/>
+                                                            <x:Static Member="models:ConditionOperator.NotEquals"/>
+                                                            <x:Static Member="models:ConditionOperator.Contains"/>
+                                                            <x:Static Member="models:ConditionOperator.DoesNotContain"/>
+                                                            <x:Static Member="models:ConditionOperator.StartsWith"/>
+                                                            <x:Static Member="models:ConditionOperator.EndsWith"/>
+                                                            <x:Static Member="models:ConditionOperator.GreaterThan"/>
+                                                            <x:Static Member="models:ConditionOperator.LessThan"/>
+                                                            <x:Static Member="models:ConditionOperator.Year"/>
+                                                            <x:Static Member="models:ConditionOperator.Month"/>
+                                                        </ComboBox>
+                                                        <TextBox Grid.Column="2" Classes="input"
+                                                                 Text="{Binding Value}" Watermark="값"/>
+                                                        <ComboBox Grid.Column="3" SelectedItem="{Binding Unit}">
+                                                            <x:Static Member="models:SizeUnit.Bytes"/>
+                                                            <x:Static Member="models:SizeUnit.KB"/>
+                                                            <x:Static Member="models:SizeUnit.MB"/>
+                                                            <x:Static Member="models:SizeUnit.GB"/>
+                                                        </ComboBox>
+                                                        <Button Grid.Column="4" Classes="danger" Content="×"
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveConditionCommand}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <Button Classes="secondary" Content="+ 조건 추가"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding AddConditionCommand}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Classes="muted" Text="규칙이 없습니다."
+                               IsVisible="{Binding !Rules.Count}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Actions -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                <Button Classes="secondary" Content="취소" Command="{Binding CancelCommand}"/>
+                <Button Classes="primary" Content="저장" Command="{Binding SaveCommand}"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

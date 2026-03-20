@@ -4,19 +4,25 @@ from typing import List
 from parsers import BaseParser
 from schema import AccountRow, safe_float, CATEGORY_PL, CATEGORY_MC
 
-KSCI_PL_MAP = {
-    6:  (CATEGORY_PL, "매출", "매출액"),
-    7:  (CATEGORY_PL, "매출", "전선매출"),
-    9:  (CATEGORY_PL, "매출", "전장매출"),
-    11: (CATEGORY_PL, "매출원가", "매출원가"),
-    12: (CATEGORY_PL, "매출원가", "제품매출원가"),
-    13: (CATEGORY_PL, "매출원가", "상품매출원가"),
-    14: (CATEGORY_PL, "매출원가", "기타매출원가"),
-    16: (CATEGORY_PL, "이익", "매출총이익"),
-    18: (CATEGORY_PL, "판관비", "판관비계"),
-}
-
 MONTH_COL_START = 5  # E = 1월
+
+# KSCM-GP (전장) 사업부 섹션 시작 행 (152행 이하)
+KSCI_SECTION_START = 152
+
+# 섹션 내 레이블 매핑 (exact match)
+KSCI_SECTION_LABEL_MAP = {
+    "매출액":      (CATEGORY_PL, "매출",    "매출액"),
+    "전선매출":    (CATEGORY_PL, "매출",    "전선매출"),
+    "전장매출":    (CATEGORY_PL, "매출",    "전장매출"),
+    "매출원가":    (CATEGORY_PL, "매출원가", "매출원가"),
+    "제품매출원가": (CATEGORY_PL, "매출원가", "제품매출원가"),
+    "상품매출원가": (CATEGORY_PL, "매출원가", "상품매출원가"),
+    "기타매출원가": (CATEGORY_PL, "매출원가", "기타매출원가"),
+    "매출총이익":  (CATEGORY_PL, "이익",    "매출총이익"),
+    "판관비계":    (CATEGORY_PL, "판관비",  "판관비계"),
+    "판매관리비":  (CATEGORY_PL, "판관비",  "판관비계"),  # alias: sheet uses "Ⅳ.판매관리비"
+    "영업이익":    (CATEGORY_PL, "이익",    "영업이익"),
+}
 
 # 사업계획 파일: IS DGO + IS 전장 시트 기반 (col 7~18 = Jan~Dec)
 KSCI_PLAN_IS_MAP = {
@@ -29,6 +35,7 @@ KSCI_PLAN_IS_MAP = {
 
 IS_PLAN_MONTH_COL_START = 7  # col 7 = Jan(1월)
 IS_PLAN_SHEETS = ["IS DGO", "IS 전장"]
+
 
 class KsciParser(BaseParser):
     def extract(self) -> List[AccountRow]:
@@ -53,31 +60,91 @@ class KsciParser(BaseParser):
         ws = wb[target_sheet]
         year = self._detect_year(ws)
 
-        for month_offset in range(12):
-            col = MONTH_COL_START + month_offset
-            month_num = month_offset + 1
-
-            test_val = ws.cell(row=6, column=col).value
-            if test_val is None or safe_float(test_val) == 0:
-                continue
-
-            ym = f"{year}-{month_num:02d}"
-            for row_num, (cat, sub, account) in KSCI_PL_MAP.items():
-                val = safe_float(ws.cell(row=row_num, column=col).value)
-                rows.append(self.make_row(ym, "KSCI", cat, sub, account, "USD", val))
-
-            op_profit = safe_float(ws.cell(row=16, column=col).value) - safe_float(ws.cell(row=18, column=col).value)
-            rows.append(self.make_row(ym, "KSCI", CATEGORY_PL, "이익", "영업이익", "USD", op_profit))
+        # KSCM-GP (전장) 사업부 섹션: 152행~ 레이블 기반 추출
+        rows.extend(self._extract_section(ws, year))
 
         rows.extend(self._extract_mc_summary(wb, year))
 
         wb.close()
         return rows
 
+    def _extract_section(self, ws, year: str) -> List[AccountRow]:
+        # 월별실적 시트에서 사업부 섹션 자동 탐지 후 레이블 기반 추출
+        label_rows: dict = {}
+
+        SECTION_KEYWORDS = ("전장", "GP", "KSCM-GP", "KSCI", "북미", "미국", "INTERNATIONAL", "AMERICA")
+
+        start_row = 1
+        for r in range(1, min(ws.max_row, 500) + 1):
+            for c in (1, 2, 3, 4):
+                val = str(ws.cell(row=r, column=c).value or "").replace(" ", "")
+                if any(kw in val.upper() for kw in SECTION_KEYWORDS):
+                    start_row = r + 1
+                    break
+            if start_row != 1:
+                break
+
+        scan_end = min(ws.max_row + 1, start_row + 400)
+
+        for r in range(start_row, scan_end):
+            for c in (1, 2, 3, 4, 5):
+                raw = ws.cell(row=r, column=c).value
+                if raw is None:
+                    continue
+                stripped = str(raw).replace(" ", "").replace("\n", "").strip()
+                import re
+                clean_name = re.sub(r'^[\dIVXivx\.\-\s]+', '', stripped)
+                for label in KSCI_SECTION_LABEL_MAP:
+                    if label not in label_rows and (
+                        clean_name == label or stripped == label or
+                        (len(label) >= 3 and stripped.endswith(label))
+                    ):
+                        label_rows[label] = r
+                        break
+
+        if "매출액" not in label_rows:
+            # 진단: 발견된 레이블과 탐색 범위 샘플 출력
+            found = list(label_rows.keys()) or []
+            samples = []
+            for r in range(start_row, min(start_row + 30, ws.max_row + 1)):
+                for c in (1, 2, 3):
+                    v = ws.cell(row=r, column=c).value
+                    if v:
+                        samples.append(f"  row{r}c{c}={repr(str(v)[:30])}")
+                        if len(samples) >= 15:
+                            break
+                if len(samples) >= 15:
+                    break
+            print(f"  [KSCI] 월별실적 (탐색시작: {start_row}행~, 종료: {scan_end}행) 매출액 미발견")
+            if found:
+                print(f"  [KSCI] 발견된 레이블: {found}")
+            if samples:
+                print(f"  [KSCI] 탐색 범위 샘플:")
+                for s in samples:
+                    print(f"  {s}")
+            return []
+
+        sales_row = label_rows["매출액"]
+        rows = []
+
+        for month_offset in range(12):
+            col = MONTH_COL_START + month_offset
+            month_num = month_offset + 1
+            test_val = ws.cell(row=sales_row, column=col).value
+            if test_val is None or safe_float(test_val) == 0:
+                continue
+            ym = f"{year}-{month_num:02d}"
+            for label, (cat, sub, account) in KSCI_SECTION_LABEL_MAP.items():
+                if label not in label_rows:
+                    continue
+                val = safe_float(ws.cell(row=label_rows[label], column=col).value)
+                rows.append(self.make_row(ym, "KSCI", cat, sub, account, "USD", val))
+
+        return rows
+
     def _extract_plan(self, wb, plan_sheets: list) -> List[AccountRow]:
         """IS DGO + IS 전장 시트를 합산하여 사업계획 월별 데이터 추출"""
         year = "2026"
-        # 시트에서 연도 감지
         for shname in plan_sheets:
             ws = wb[shname]
             for row in ws.iter_rows(min_row=1, max_row=3, values_only=True):
@@ -89,7 +156,6 @@ class KsciParser(BaseParser):
                             year = m.group(1)
                             break
 
-        # (month_offset, row_num) → 합산값
         monthly = {}
         for shname in plan_sheets:
             ws = wb[shname]
@@ -111,14 +177,13 @@ class KsciParser(BaseParser):
                 continue
             for row_num, (cat, sub, account) in KSCI_PLAN_IS_MAP.items():
                 val = monthly.get((month_offset, row_num), 0.0)
-                rows.append(self.make_row(ym, "KSCI", cat, sub, account, "USD", val))
-            # 영업이익 = 매출 - 재료비 - 노무비 - 경비 - 판관비
+                rows.append(self.make_row(ym, "KSCI", cat, sub, account, "USD", val, 구분="계획"))
             op = (monthly.get((month_offset, 5), 0.0)
                   - monthly.get((month_offset, 9), 0.0)
                   - monthly.get((month_offset, 21), 0.0)
                   - monthly.get((month_offset, 35), 0.0)
                   - monthly.get((month_offset, 71), 0.0))
-            rows.append(self.make_row(ym, "KSCI", CATEGORY_PL, "이익", "영업이익", "USD", op))
+            rows.append(self.make_row(ym, "KSCI", CATEGORY_PL, "이익", "영업이익", "USD", op, 구분="계획"))
         return rows
 
     def _extract_mc_summary(self, wb, year) -> List[AccountRow]:
@@ -140,7 +205,6 @@ class KsciParser(BaseParser):
         }
 
         month_col = None
-        month_num = None
         for row in ws.iter_rows(min_row=4, max_row=6, values_only=False):
             for cell in row:
                 if cell.value and isinstance(cell.value, str) and "매출액" in str(cell.value):

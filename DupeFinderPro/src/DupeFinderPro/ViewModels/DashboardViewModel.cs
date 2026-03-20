@@ -12,44 +12,60 @@ public sealed partial class DashboardViewModel : ViewModelBase
 {
     private readonly ScanJobService _scanJobService;
     private readonly IFileOperationService _fileOps;
+    private readonly IScenarioRepository _scenarioRepo;
+    private readonly IClassifyRecordRepository _classifyRepo;
 
-    public event Action? NavigateToNewScan;
-    public event Action? NavigateToHistory;
-    public event Action? NavigateToResults;
+    // ── 파일 분류 통계 ──────────────────────────────────────────────────
+    [ObservableProperty] private int    _totalScenariosCount;
+    [ObservableProperty] private int    _activeScenarioCount;
+    [ObservableProperty] private int    _totalFilesOrganized;
+    [ObservableProperty] private string _totalBytesOrganizedText = "0 B";
+    [ObservableProperty] private string _lastOrganizeTime = "없음";
 
-    [ObservableProperty] private int _totalDuplicatesFound;
-    [ObservableProperty] private long _totalWastedBytes;
-    [ObservableProperty] private int _totalScansRun;
-    [ObservableProperty] private string _lastScanTime = "Never";
-    [ObservableProperty] private bool _hasRecentScan;
+    // ── 중복 파일 스캔 통계 ──────────────────────────────────────────────
+    [ObservableProperty] private int    _totalDuplicatesFound;
+    [ObservableProperty] private long   _totalWastedBytes;
+    [ObservableProperty] private int    _totalScansRun;
+    [ObservableProperty] private string _lastScanTime = "없음";
+    [ObservableProperty] private bool   _hasRecentScan;
     [ObservableProperty] private string _recentScanName = string.Empty;
     [ObservableProperty] private string _recentScanStatus = string.Empty;
     [ObservableProperty] private string _recentScanSummary = string.Empty;
 
     // ── 빈 폴더 삭제 ─────────────────────────────────────────────────
     [ObservableProperty] private string _emptyFolderRoot = string.Empty;
-    [ObservableProperty] private bool _isDeletingEmptyFolders;
+    [ObservableProperty] private bool   _isDeletingEmptyFolders;
     [ObservableProperty] private string _emptyFolderResult = string.Empty;
-    [ObservableProperty] private bool _hasEmptyFolderResult;
+    [ObservableProperty] private bool   _hasEmptyFolderResult;
 
     public ObservableCollection<ScanJobSummaryViewModel> RecentJobs { get; } = [];
 
     public string TotalWastedFormatted => FormatBytes(TotalWastedBytes);
 
-    public DashboardViewModel(ScanJobService scanJobService, IFileOperationService fileOps)
+    // ── 탐색 이벤트 ────────────────────────────────────────────────────
+    public event Action? NavigateToScenarios;
+    public event Action? NavigateToOrganize;
+    public event Action? NavigateToNewScan;
+    public event Action? NavigateToHistory;
+    public event Action? NavigateToResults;
+
+    public DashboardViewModel(
+        ScanJobService scanJobService,
+        IFileOperationService fileOps,
+        IScenarioRepository scenarioRepo,
+        IClassifyRecordRepository classifyRepo)
     {
         _scanJobService = scanJobService;
         _fileOps = fileOps;
+        _scenarioRepo = scenarioRepo;
+        _classifyRepo = classifyRepo;
     }
 
-    [RelayCommand]
-    private void StartNewScan() => NavigateToNewScan?.Invoke();
-
-    [RelayCommand]
-    private void ViewHistory() => NavigateToHistory?.Invoke();
-
-    [RelayCommand]
-    private void ViewResults() => NavigateToResults?.Invoke();
+    [RelayCommand] private void GoToScenarios() => NavigateToScenarios?.Invoke();
+    [RelayCommand] private void GoToOrganize()  => NavigateToOrganize?.Invoke();
+    [RelayCommand] private void StartNewScan()  => NavigateToNewScan?.Invoke();
+    [RelayCommand] private void ViewHistory()   => NavigateToHistory?.Invoke();
+    [RelayCommand] private void ViewResults()   => NavigateToResults?.Invoke();
 
     [RelayCommand]
     private async Task DeleteEmptyFolders()
@@ -82,6 +98,26 @@ public sealed partial class DashboardViewModel : ViewModelBase
 
     public void Refresh()
     {
+        RefreshClassifyStats();
+        RefreshScanStats();
+    }
+
+    private void RefreshClassifyStats()
+    {
+        var scenarios = _scenarioRepo.GetAll();
+        TotalScenariosCount = scenarios.Count;
+        ActiveScenarioCount = scenarios.Count(s => s.IsActive);
+
+        var records = _classifyRepo.GetAll();
+        TotalFilesOrganized = records.Sum(r => r.FileCount);
+        TotalBytesOrganizedText = FormatBytes(records.Sum(r => r.TotalBytes));
+        LastOrganizeTime = records.Count > 0
+            ? records.Max(r => r.ExecutedAt).ToString("g")
+            : "없음";
+    }
+
+    private void RefreshScanStats()
+    {
         var jobs = _scanJobService.GetAllJobs();
         TotalScansRun = jobs.Count;
 
@@ -98,13 +134,13 @@ public sealed partial class DashboardViewModel : ViewModelBase
             RecentScanStatus = latest.Status.ToString();
             LastScanTime = latest.CreatedAt.ToString("g");
             RecentScanSummary = latest.Result is { } r
-                ? $"{r.DuplicateGroups.Count} groups · {FormatBytes(r.TotalWastedBytes)} wasted"
+                ? $"{r.DuplicateGroups.Count}개 그룹 · {FormatBytes(r.TotalWastedBytes)} 낭비"
                 : string.Empty;
         }
         else
         {
             HasRecentScan = false;
-            LastScanTime = "Never";
+            LastScanTime = "없음";
         }
 
         RecentJobs.Clear();
@@ -127,7 +163,7 @@ public sealed class ScanJobSummaryViewModel(ScanJob job)
     public string Status     => job.Status.ToString();
     public string CreatedAt  => job.CreatedAt.ToString("g");
     public string Summary    => job.Result is { } r
-        ? $"{r.DuplicateGroups.Count} groups · {FormatBytes(r.TotalWastedBytes)} wasted"
+        ? $"{r.DuplicateGroups.Count}개 그룹 · {FormatBytes(r.TotalWastedBytes)} 낭비"
         : job.ErrorMessage ?? string.Empty;
     public bool IsCompleted  => job.Status == ScanJobStatus.Completed;
     public bool IsFailed     => job.Status == ScanJobStatus.Failed;

@@ -16,7 +16,7 @@ KCTR_PL_MAP = {
     38: (CATEGORY_PL, "이익", "매출총이익"),
     40: (CATEGORY_PL, "판관비", "판매비"),
     48: (CATEGORY_PL, "판관비", "관리비"),
-    66: (CATEGORY_PL, "이익", "영업이익"),
+    68: (CATEGORY_PL, "이익", "영업이익"),
 }
 
 KCTR_MC_MAP = {
@@ -126,7 +126,7 @@ class KctrParser(BaseParser):
             ym = f"{year}-{month_num:02d}"
             for row_num, (cat, sub, account) in KCTR_PLAN_MAP.items():
                 val = safe_float(ws.cell(row=row_num, column=col).value)
-                rows.append(self.make_row(ym, "KCTR", cat, sub, account, "TRY", val))
+                rows.append(self.make_row(ym, "KCTR", cat, sub, account, "TRY", val, 구분="계획"))
         return rows
 
     def _detect_year_plan(self, ws) -> str:
