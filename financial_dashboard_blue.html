@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>재무 대시보드 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@200;400;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --electric-blue: #0066ff;
+            --neon-cyan: #00ffff;
+            --royal-blue: #4169e1;
+            --deep-navy: #0a1929;
+            --dark-blue: #132f4c;
+            --ice-blue: #b3d9ff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Mono', monospace;
+            background: linear-gradient(135deg, var(--deep-navy) 0%, var(--dark-blue) 50%, #001e3c 100%);
+            color: #fff;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Animated gradient background */
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                45deg,
+                rgba(0, 102, 255, 0.1) 0%,
+                rgba(0, 255, 255, 0.1) 25%,
+                rgba(65, 105, 225, 0.1) 50%,
+                rgba(10, 25, 41, 0.2) 75%,
+                rgba(0, 102, 255, 0.1) 100%
+            );
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Grain texture */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 60px 40px;
+        }
+
+        /* Hero Header */
+        .hero {
+            margin-bottom: 120px;
+            position: relative;
+        }
+
+        .hero h1 {
+            font-family: 'Crimson Pro', serif;
+            font-size: clamp(60px, 10vw, 140px);
+            font-weight: 900;
+            line-height: 0.9;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--electric-blue), var(--neon-cyan), var(--royal-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: -0.04em;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .hero .subtitle {
+            font-size: clamp(18px, 2vw, 28px);
+            color: var(--ice-blue);
+            font-weight: 300;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 0.3s forwards;
+        }
+
+        .hero .meta {
+            display: flex;
+            gap: 60px;
+            flex-wrap: wrap;
+            opacity: 0;
+            animation: fadeInUp 1s ease-out 0.6s forwards;
+        }
+
+        .hero .meta-item {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .hero .meta-item span {
+            display: block;
+            font-size: 24px;
+            color: var(--neon-cyan);
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        /* Stats Grid - Brutalist Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 100px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px solid rgba(0, 102, 255, 0.3);
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
+            transition: left 0.6s;
+        }
+
+        .stat-card:hover::before {
+            left: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 20px 60px rgba(0, 255, 255, 0.3);
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--ice-blue);
+            margin-bottom: 16px;
+        }
+
+        .stat-card .value {
+            font-family: 'Crimson Pro', serif;
+            font-size: clamp(42px, 5vw, 72px);
+            font-weight: 900;
+            line-height: 1;
+            color: #fff;
+            margin-bottom: 12px;
+            transition: color 0.3s;
+        }
+
+        .stat-card:hover .value {
+            color: var(--neon-cyan);
+        }
+
+        .stat-card .detail {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Revenue Comparison - Diagonal Layout */
+        .revenue-section {
+            margin-bottom: 120px;
+        }
+
+        .section-title {
+            font-family: 'Crimson Pro', serif;
+            font-size: clamp(36px, 5vw, 64px);
+            font-weight: 700;
+            margin-bottom: 60px;
+            color: var(--neon-cyan);
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+        }
+
+        .revenue-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .revenue-bar {
+            position: relative;
+            opacity: 0;
+            animation: slideInLeft 0.8s ease-out forwards;
+        }
+
+        .revenue-bar:nth-child(1) { animation-delay: 0.1s; }
+        .revenue-bar:nth-child(2) { animation-delay: 0.2s; }
+        .revenue-bar:nth-child(3) { animation-delay: 0.3s; }
+
+        .revenue-bar-inner {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 6px solid var(--electric-blue);
+            transition: all 0.4s;
+        }
+
+        .revenue-bar:nth-child(2) .revenue-bar-inner {
+            border-left-color: var(--royal-blue);
+        }
+
+        .revenue-bar:nth-child(3) .revenue-bar-inner {
+            border-left-color: var(--neon-cyan);
+        }
+
+        .revenue-bar:hover .revenue-bar-inner {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(20px);
+        }
+
+        .revenue-name {
+            font-family: 'Crimson Pro', serif;
+            font-size: 48px;
+            font-weight: 700;
+            min-width: 200px;
+            color: #fff;
+        }
+
+        .revenue-visual {
+            flex: 1;
+            height: 80px;
+            background: linear-gradient(90deg, var(--electric-blue), transparent);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .revenue-bar:nth-child(2) .revenue-visual {
+            background: linear-gradient(90deg, var(--royal-blue), transparent);
+        }
+
+        .revenue-bar:nth-child(3) .revenue-visual {
+            background: linear-gradient(90deg, var(--neon-cyan), transparent);
+        }
+
+        .revenue-amount {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: 'Crimson Pro', serif;
+            font-size: 36px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Profit Ranking - Asymmetric */
+        .profit-section {
+            margin-bottom: 120px;
+        }
+
+        .profit-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .profit-card {
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(10, 25, 41, 0.1));
+            padding: 50px;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .profit-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 255, 255, 0.2) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .profit-card:hover::after {
+            opacity: 1;
+        }
+
+        .profit-card:hover {
+            transform: scale(1.05);
+            border-color: var(--neon-cyan);
+        }
+
+        .profit-rank {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--electric-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Crimson Pro', serif;
+            font-size: 42px;
+            font-weight: 900;
+            color: #fff;
+        }
+
+        .profit-card:nth-child(2) .profit-rank {
+            background: var(--royal-blue);
+        }
+
+        .profit-card:nth-child(3) .profit-rank {
+            background: var(--neon-cyan);
+            color: var(--deep-navy);
+        }
+
+        .profit-company {
+            font-family: 'Crimson Pro', serif;
+            font-size: 56px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .profit-rate {
+            font-size: 72px;
+            font-weight: 900;
+            font-family: 'Crimson Pro', serif;
+            background: linear-gradient(135deg, var(--electric-blue), var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+
+        .profit-details {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .profit-details div {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Monthly Trend - Graph */
+        .trend-section {
+            margin-bottom: 80px;
+        }
+
+        .trend-canvas-wrapper {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 60px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trend-canvas-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, transparent 0%, rgba(0, 255, 255, 0.05) 100%);
+            pointer-events: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 60px 0;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.4);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .profit-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .revenue-bar-inner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .revenue-visual {
+                width: 100%;
+            }
+        }
+
+        /* Download Button */
+        .download-btn {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            background: linear-gradient(135deg, var(--electric-blue), var(--neon-cyan));
+            color: #fff;
+            border: none;
+            padding: 20px 40px;
+            font-family: 'DM Mono', monospace;
+            font-size: 16px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            border-radius: 0;
+            box-shadow: 0 10px 40px rgba(0, 255, 255, 0.4);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 60px rgba(0, 255, 255, 0.6);
+        }
+
+        .download-btn:active {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero -->
+        <header class="hero">
+            <h1>Financial<br>Dashboard<br>2026</h1>
+            <div class="subtitle">글로벌 사업장 재무 성과 분석</div>
+            <div class="meta">
+                <div class="meta-item">
+                    기간
+                    <span>2026.01 - 2026.12</span>
+                </div>
+                <div class="meta-item">
+                    사업장
+                    <span>3개 법인</span>
+                </div>
+                <div class="meta-item">
+                    총 매출
+                    <span>8,225억원</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Stats -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="label">Total Revenue</div>
+                <div class="value">822.5B</div>
+                <div class="detail">연간 총 매출 (KRW)</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Operating Profit</div>
+                <div class="value">-37.4B</div>
+                <div class="detail">연간 영업이익 (KRW)</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Avg. Margin</div>
+                <div class="value">3.09%</div>
+                <div class="detail">평균 이익률</div>
+            </div>
+        </section>
+
+        <!-- Revenue Comparison -->
+        <section class="revenue-section">
+            <h2 class="section-title">Revenue by Division</h2>
+            <div class="revenue-bars">
+                <div class="revenue-bar">
+                    <div class="revenue-bar-inner">
+                        <div class="revenue-name">KSCE</div>
+                        <div class="revenue-visual" style="width: 100%;">
+                            <div class="revenue-amount">6,726억원</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="revenue-bar">
+                    <div class="revenue-bar-inner">
+                        <div class="revenue-name">KSCCZ</div>
+                        <div class="revenue-visual" style="width: 11.2%;">
+                            <div class="revenue-amount">755억원</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="revenue-bar">
+                    <div class="revenue-bar-inner">
+                        <div class="revenue-name">KCTR</div>
+                        <div class="revenue-visual" style="width: 11.0%;">
+                            <div class="revenue-amount">742억원</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Profit Ranking -->
+        <section class="profit-section">
+            <h2 class="section-title">Profitability Ranking</h2>
+            <div class="profit-grid">
+                <div class="profit-card">
+                    <div class="profit-rank">1</div>
+                    <div class="profit-company">KCTR</div>
+                    <div class="profit-rate">10.78%</div>
+                    <div class="profit-details">
+                        <div>
+                            <span>매출</span>
+                            <span>742억원</span>
+                        </div>
+                        <div>
+                            <span>영업이익</span>
+                            <span>80억원</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="profit-card">
+                    <div class="profit-rank">2</div>
+                    <div class="profit-company">KSCCZ</div>
+                    <div class="profit-rate">5.91%</div>
+                    <div class="profit-details">
+                        <div>
+                            <span>매출</span>
+                            <span>755억원</span>
+                        </div>
+                        <div>
+                            <span>영업이익</span>
+                            <span>44억원</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="profit-card">
+                    <div class="profit-rank">3</div>
+                    <div class="profit-company">KSCE</div>
+                    <div class="profit-rate">-7.42%</div>
+                    <div class="profit-details">
+                        <div>
+                            <span>매출</span>
+                            <span>6,726억원</span>
+                        </div>
+                        <div>
+                            <span>영업이익</span>
+                            <span>-498억원</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Monthly Trend -->
+        <section class="trend-section">
+            <h2 class="section-title">Monthly Sales Trend</h2>
+            <div class="trend-canvas-wrapper">
+                <canvas id="trendChart" width="1600" height="600"></canvas>
+            </div>
+        </section>
+
+        <footer>
+            <p>© 2026 Financial Dashboard · Generated with Claude Code</p>
+        </footer>
+    </div>
+
+    <button class="download-btn" onclick="captureScreenshot()">📸 스크린샷 저장</button>
+
+    <script>
+        // Monthly Trend Chart
+        const canvas = document.getElementById('trendChart');
+        const ctx = canvas.getContext('2d');
+
+        const salesData = {
+            'KCTR': [3741242710, 4668896370, 6645845524, 5543907951, 5072989070, 7729646650, 4731807556, 7045405952, 6362025655, 9346540266, 6623507399, 6737261365],
+            'KSCCZ': [6215153118, 4847313412, 7087748644, 6975268772, 5653368953, 6564737011, 6812880457, 5165029268, 6827978221, 5719345586, 6550820062, 7119053329],
+            'KSCE': [42079394700, 49108665900, 57591604000, 53037762750, 54966429000, 57694054250, 44407364750, 38212346550, 60600089754, 69629764567, 69091739787, 76258799650]
+        };
+
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const colors = {
+            'KCTR': '#0066ff',
+            'KSCCZ': '#4169e1',
+            'KSCE': '#00ffff'
+        };
+
+        const padding = 80;
+        const chartWidth = canvas.width - padding * 2;
+        const chartHeight = canvas.height - padding * 2;
+
+        const allValues = Object.values(salesData).flat();
+        const maxValue = Math.max(...allValues);
+        const minValue = 0;
+
+        // Draw grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+            const y = padding + (chartHeight / 5) * i;
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(canvas.width - padding, y);
+            ctx.stroke();
+
+            const value = maxValue - (maxValue / 5) * i;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '16px "DM Mono"';
+            ctx.textAlign = 'right';
+            ctx.fillText((value / 100000000).toFixed(0) + '억', padding - 15, y + 5);
+        }
+
+        // Draw X-axis labels
+        months.forEach((month, i) => {
+            const x = padding + (chartWidth / (months.length - 1)) * i;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '14px "DM Mono"';
+            ctx.textAlign = 'center';
+            ctx.fillText(month, x, canvas.height - padding + 30);
+        });
+
+        // Draw lines
+        Object.keys(salesData).forEach((corp, index) => {
+            const data = salesData[corp];
+
+            // Line
+            ctx.strokeStyle = colors[corp];
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowColor = colors[corp];
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+
+            data.forEach((value, i) => {
+                const x = padding + (chartWidth / (data.length - 1)) * i;
+                const y = padding + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Points
+            data.forEach((value, i) => {
+                const x = padding + (chartWidth / (data.length - 1)) * i;
+                const y = padding + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                ctx.fillStyle = colors[corp];
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#0a1929';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            });
+        });
+
+        // Legend
+        const legendY = 40;
+        Object.keys(colors).forEach((corp, i) => {
+            const x = padding + i * 150;
+
+            ctx.strokeStyle = colors[corp];
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(x, legendY);
+            ctx.lineTo(x + 40, legendY);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 18px "DM Mono"';
+            ctx.textAlign = 'left';
+            ctx.fillText(corp, x + 50, legendY + 6);
+        });
+
+        // Screenshot function
+        function captureScreenshot() {
+            alert('스크린샷 기능을 사용하려면 브라우저의 스크린샷 도구를 사용하거나, 전체 화면 캡처(Print Screen)를 이용하세요!');
+        }
+
+        // Scroll reveal animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.stat-card, .profit-card').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(30px)';
+            el.style.transition = 'opacity 0.8s, transform 0.8s';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

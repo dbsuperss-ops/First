@@ -41,7 +41,7 @@ public sealed partial class NewScanViewModel : ViewModelBase
     [ObservableProperty] private string _excludeKeywordsRaw = string.Empty;
 
     // ── Size filter ───────────────────────────────────────────────────────
-    [ObservableProperty] private long _minSizeKb;
+    [ObservableProperty] private long _minSizeKb = 10; // 기본값 10KB - 작은 썸네일/아이콘 제외
     [ObservableProperty] private long? _maxSizeKb;
     [ObservableProperty] private bool _hasMaxSize;
 
@@ -171,7 +171,7 @@ public sealed partial class NewScanViewModel : ViewModelBase
         ExcludeExtensionsRaw = string.Empty;
         IncludeKeywordsRaw = string.Empty;
         ExcludeKeywordsRaw = string.Empty;
-        MinSizeKb = 0;
+        MinSizeKb = 10;
         MaxSizeKb = null;
         HasMaxSize = false;
         CreatedFrom = null;

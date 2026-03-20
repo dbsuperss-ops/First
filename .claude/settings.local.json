@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/gabriel/.claude/plugins/marketplaces/anthropic-agent-skills/skills/theme-factory/**)"
+      "Read(//home/gabriel/.claude/plugins/marketplaces/anthropic-agent-skills/skills/theme-factory/**)",
+      "Bash(dotnet build -c Release)"
     ],
     "deny": [],
     "ask": []

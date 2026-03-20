@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>월별 매출 추이 - Sunset Boulevard</title>
+</head>
+<body style="background-color: #264653; margin: 0; padding: 0;">
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#264653';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+        const salesData = {
+            'KCTR': [3741242710, 4668896370, 6645845524, 5543907951, 5072989070, 7729646650, 4731807556, 7045405952, 6362025655, 9346540266, 6623507399, 6737261365],
+            'KSCCZ': [6215153118, 4847313412, 7087748644, 6975268772, 5653368953, 6564737011, 6812880457, 5165029268, 6827978221, 5719345586, 6550820062, 7119053329],
+            'KSCE': [42079394700, 49108665900, 57591604000, 53037762750, 54966429000, 57694054250, 44407364750, 38212346550, 60600089754, 69629764567, 69091739787, 76258799650]
+        };
+
+        ctx.fillStyle = '#e76f51';
+        ctx.font = 'bold 56px "DejaVu Serif", serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('사업장별 월별 매출 추이', canvas.width / 2, 90);
+
+        ctx.fillStyle = '#e9c46a';
+        ctx.font = '32px "DejaVu Sans", sans-serif';
+        ctx.fillText('2026년 1월 ~ 12월', canvas.width / 2, 145);
+
+        const chartX = 180;
+        const chartY = 220;
+        const chartWidth = 1560;
+        const chartHeight = 720;
+
+        const allSales = Object.values(salesData).flat();
+        const maxValue = Math.max(...allSales);
+        const minValue = 0;
+
+        // Grid
+        ctx.strokeStyle = 'rgba(233, 196, 106, 0.15)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+            const y = chartY + (chartHeight / 5) * i;
+            ctx.beginPath();
+            ctx.moveTo(chartX, y);
+            ctx.lineTo(chartX + chartWidth, y);
+            ctx.stroke();
+
+            const value = maxValue - (maxValue / 5) * i;
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '22px "DejaVu Sans", sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(Math.round(value / 100000000) + '억', chartX - 20, y + 7);
+        }
+
+        // X-axis labels
+        months.forEach((month, i) => {
+            const x = chartX + (chartWidth / (months.length - 1)) * i;
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = 'bold 24px "DejaVu Sans", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(month, x, chartY + chartHeight + 45);
+        });
+
+        const colors = {
+            'KCTR': '#e76f51',
+            'KSCCZ': '#f4a261',
+            'KSCE': '#e9c46a'
+        };
+
+        // Draw lines
+        Object.keys(salesData).forEach(corp => {
+            ctx.strokeStyle = colors[corp];
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.shadowColor = colors[corp];
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+
+            salesData[corp].forEach((value, i) => {
+                const x = chartX + (chartWidth / (months.length - 1)) * i;
+                const y = chartY + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            // Draw points
+            salesData[corp].forEach((value, i) => {
+                const x = chartX + (chartWidth / (months.length - 1)) * i;
+                const y = chartY + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                ctx.fillStyle = colors[corp];
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#264653';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            });
+        });
+
+        // Legend
+        const legendY = chartY + chartHeight + 100;
+        const legendItems = [
+            { corp: 'KCTR', color: colors.KCTR, label: 'KCTR (터키)' },
+            { corp: 'KSCCZ', color: colors.KSCCZ, label: 'KSCCZ (체코)' },
+            { corp: 'KSCE', color: colors.KSCE, label: 'KSCE (이집트)' }
+        ];
+
+        legendItems.forEach((item, i) => {
+            const x = canvas.width / 2 - 350 + i * 280;
+
+            ctx.strokeStyle = item.color;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x, legendY);
+            ctx.lineTo(x + 80, legendY);
+            ctx.stroke();
+
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(x + 40, legendY, 8, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.strokeStyle = '#264653';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = 'bold 28px "DejaVu Sans", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(item.label, x + 95, legendY + 10);
+        });
+
+        canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chart4_monthly_trend_sunset.png';
+            a.click();
+        });
+    </script>
+</body>
+</html>

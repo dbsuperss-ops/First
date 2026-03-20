@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>사업장 재무 대시보드 - Sunset Boulevard</title>
+    <style>
+        body {
+            background-color: #264653;
+            margin: 0;
+            padding: 20px;
+            font-family: "DejaVu Sans", sans-serif;
+        }
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            background-color: #264653;
+        }
+        .download-btn {
+            background-color: #e76f51;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+            margin: 30px auto;
+        }
+        .download-btn:hover {
+            background-color: #f4a261;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="canvas1" width="1920" height="1080"></canvas>
+        <canvas id="canvas2" width="1920" height="1080"></canvas>
+        <canvas id="canvas3" width="1920" height="1080"></canvas>
+        <canvas id="canvas4" width="1920" height="1080"></canvas>
+        <button class="download-btn" onclick="downloadAll()">📥 모든 차트 PNG로 다운로드</button>
+    </div>
+
+    <script>
+        // Chart 1: Sales Comparison
+        function drawChart1() {
+            const canvas = document.getElementById('canvas1');
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#264653';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const data = [
+                { name: 'KSCE', value: 672678015658, label: '6,726억원', color: '#e76f51' },
+                { name: 'KSCCZ', value: 75538696833, label: '755억원', color: '#f4a261' },
+                { name: 'KCTR', value: 74249076468, label: '742억원', color: '#e9c46a' }
+            ];
+
+            const chartX = 200;
+            const chartY = 250;
+            const chartWidth = 1500;
+            const chartHeight = 650;
+            const barWidth = 350;
+            const spacing = 100;
+            const maxValue = Math.max(...data.map(d => d.value));
+
+            ctx.fillStyle = '#e76f51';
+            ctx.font = 'bold 56px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('사업장별 매출 비교', canvas.width / 2, 100);
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '32px Arial';
+            ctx.fillText('2026년 연간 실적', canvas.width / 2, 160);
+
+            data.forEach((item, index) => {
+                const barHeight = (item.value / maxValue) * chartHeight;
+                const x = chartX + index * (barWidth + spacing);
+                const y = chartY + chartHeight - barHeight;
+
+                const gradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+                gradient.addColorStop(0, item.color);
+                gradient.addColorStop(1, adjustBrightness(item.color, -30));
+                ctx.fillStyle = gradient;
+
+                roundRect(ctx, x, y, barWidth, barHeight, 10);
+                ctx.fill();
+
+                ctx.strokeStyle = '#264653';
+                ctx.lineWidth = 3;
+                roundRect(ctx, x, y, barWidth, barHeight, 10);
+                ctx.stroke();
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(item.label, x + barWidth / 2, y - 25);
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 40px Arial';
+                ctx.fillText(item.name, x + barWidth / 2, chartY + chartHeight + 70);
+            });
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = (maxValue / 5) * i;
+                const y = chartY + chartHeight - (chartHeight / 5) * i;
+                const label = Math.round(value / 100000000) + '억';
+                ctx.fillText(label, chartX - 25, y + 8);
+
+                ctx.strokeStyle = 'rgba(233, 196, 106, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(chartX, y);
+                ctx.lineTo(chartX + chartWidth, y);
+                ctx.stroke();
+            }
+        }
+
+        // Chart 2: Integrated Comparison
+        function drawChart2() {
+            const canvas = document.getElementById('canvas2');
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#264653';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const data = [
+                { name: 'KCTR', 매출: 74249076468, 영업이익: 8000378122, 비용: 66248698345 },
+                { name: 'KSCCZ', 매출: 75538696833, 영업이익: 4466501643, 비용: 65633005417 },
+                { name: 'KSCE', 매출: 672678015658, 영업이익: -49887720827, 비용: 667880535573 }
+            ];
+
+            ctx.fillStyle = '#e76f51';
+            ctx.font = 'bold 52px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('사업장별 매출/이익/비용 통합 비교', canvas.width / 2, 90);
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '28px Arial';
+            ctx.fillText('2026년 연간 실적', canvas.width / 2, 140);
+
+            const chartX = 150;
+            const chartY = 200;
+            const chartWidth = 1620;
+            const chartHeight = 700;
+            const groupWidth = 450;
+            const barWidth = 120;
+            const spacing = 50;
+
+            const maxValue = Math.max(...data.map(d => Math.max(d.매출, d.비용)));
+
+            const colors = {
+                매출: '#e76f51',
+                영업이익: '#f4a261',
+                비용: '#e9c46a'
+            };
+
+            data.forEach((item, index) => {
+                const groupX = chartX + index * (groupWidth + spacing);
+
+                [
+                    { key: '매출', value: item.매출, offset: 0 },
+                    { key: '영업이익', value: Math.abs(item.영업이익), offset: barWidth + 15 },
+                    { key: '비용', value: item.비용, offset: (barWidth + 15) * 2 }
+                ].forEach(bar => {
+                    const barHeight = (bar.value / maxValue) * chartHeight;
+                    const x = groupX + bar.offset;
+                    const y = chartY + chartHeight - barHeight;
+
+                    const gradient = ctx.createLinearGradient(x, y, x, y + barHeight);
+                    gradient.addColorStop(0, colors[bar.key]);
+                    gradient.addColorStop(1, adjustBrightness(colors[bar.key], -30));
+                    ctx.fillStyle = gradient;
+
+                    roundRect(ctx, x, y, barWidth, barHeight, 8);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#264653';
+                    ctx.lineWidth = 2;
+                    roundRect(ctx, x, y, barWidth, barHeight, 8);
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = 'bold 20px Arial';
+                    ctx.textAlign = 'center';
+                    const label = Math.round(bar.value / 100000000) + '억';
+                    ctx.fillText(label, x + barWidth / 2, y - 12);
+                });
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 36px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(item.name, groupX + groupWidth / 2, chartY + chartHeight + 60);
+            });
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '22px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = (maxValue / 5) * i;
+                const y = chartY + chartHeight - (chartHeight / 5) * i;
+                ctx.fillText(Math.round(value / 100000000) + '억', chartX - 20, y + 7);
+
+                ctx.strokeStyle = 'rgba(233, 196, 106, 0.15)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(chartX, y);
+                ctx.lineTo(chartX + chartWidth, y);
+                ctx.stroke();
+            }
+
+            const legendY = chartY + chartHeight + 120;
+            const legendItems = [
+                { label: '매출', color: colors.매출 },
+                { label: '영업이익', color: colors.영업이익 },
+                { label: '비용', color: colors.비용 }
+            ];
+
+            legendItems.forEach((item, i) => {
+                const x = canvas.width / 2 - 280 + i * 220;
+
+                ctx.fillStyle = item.color;
+                ctx.fillRect(x, legendY, 50, 50);
+                ctx.strokeStyle = '#264653';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x, legendY, 50, 50);
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 28px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(item.label, x + 65, legendY + 35);
+            });
+        }
+
+        // Chart 3: Profit Rate Ranking
+        function drawChart3() {
+            const canvas = document.getElementById('canvas3');
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#264653';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const data = [
+                { name: 'KCTR', rate: 10.78, sales: 74249076468, profit: 8000378122 },
+                { name: 'KSCCZ', rate: 5.91, sales: 75538696833, profit: 4466501643 },
+                { name: 'KSCE', rate: -7.42, sales: 672678015658, profit: -49887720827 }
+            ].sort((a, b) => b.rate - a.rate);
+
+            ctx.fillStyle = '#e76f51';
+            ctx.font = 'bold 56px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('사업장별 이익률 순위', canvas.width / 2, 100);
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '32px Arial';
+            ctx.fillText('2026년 연간 실적 기준', canvas.width / 2, 160);
+
+            const chartX = 320;
+            const chartY = 280;
+            const barHeight = 140;
+            const spacing = 100;
+            const maxBarWidth = 1200;
+
+            const rankColors = ['#e76f51', '#f4a261', '#e9c46a'];
+
+            data.forEach((item, index) => {
+                const y = chartY + index * (barHeight + spacing);
+
+                const absMaxRate = 15;
+                const barWidth = Math.abs(item.rate / absMaxRate) * maxBarWidth;
+
+                const gradient = ctx.createLinearGradient(chartX, y, chartX + barWidth, y);
+                const color = rankColors[index];
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(1, adjustBrightness(color, -30));
+
+                ctx.fillStyle = gradient;
+                roundRect(ctx, chartX, y, barWidth, barHeight, 12);
+                ctx.fill();
+
+                ctx.strokeStyle = '#264653';
+                ctx.lineWidth = 4;
+                roundRect(ctx, chartX, y, barWidth, barHeight, 12);
+                ctx.stroke();
+
+                ctx.fillStyle = '#264653';
+                ctx.beginPath();
+                ctx.arc(chartX - 100, y + barHeight / 2, 50, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 6;
+                ctx.stroke();
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${index + 1}`, chartX - 100, y + barHeight / 2 + 18);
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(item.name, chartX - 140, y + barHeight / 2 + 18);
+
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 52px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${item.rate.toFixed(2)}%`, chartX + 30, y + barHeight / 2 + 18);
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = '28px Arial';
+                ctx.textAlign = 'left';
+                const salesLabel = `매출: ${Math.round(item.sales / 100000000).toLocaleString()}억원`;
+                const profitLabel = `영업이익: ${Math.round(item.profit / 100000000).toLocaleString()}억원`;
+                ctx.fillText(salesLabel, chartX + barWidth + 40, y + 55);
+                ctx.fillText(profitLabel, chartX + barWidth + 40, y + 105);
+            });
+        }
+
+        // Chart 4: Monthly Trend
+        function drawChart4() {
+            const canvas = document.getElementById('canvas4');
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#264653';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const months = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+
+            const salesData = {
+                'KCTR': [3741242710, 4668896370, 6645845524, 5543907951, 5072989070, 7729646650, 4731807556, 7045405952, 6362025655, 9346540266, 6623507399, 6737261365],
+                'KSCCZ': [6215153118, 4847313412, 7087748644, 6975268772, 5653368953, 6564737011, 6812880457, 5165029268, 6827978221, 5719345586, 6550820062, 7119053329],
+                'KSCE': [42079394700, 49108665900, 57591604000, 53037762750, 54966429000, 57694054250, 44407364750, 38212346550, 60600089754, 69629764567, 69091739787, 76258799650]
+            };
+
+            ctx.fillStyle = '#e76f51';
+            ctx.font = 'bold 56px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('사업장별 월별 매출 추이', canvas.width / 2, 90);
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '32px Arial';
+            ctx.fillText('2026년 1월 ~ 12월', canvas.width / 2, 145);
+
+            const chartX = 180;
+            const chartY = 220;
+            const chartWidth = 1560;
+            const chartHeight = 720;
+
+            const allSales = Object.values(salesData).flat();
+            const maxValue = Math.max(...allSales);
+            const minValue = 0;
+
+            ctx.strokeStyle = 'rgba(233, 196, 106, 0.15)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = chartY + (chartHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(chartX, y);
+                ctx.lineTo(chartX + chartWidth, y);
+                ctx.stroke();
+
+                const value = maxValue - (maxValue / 5) * i;
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = '22px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(value / 100000000) + '억', chartX - 20, y + 7);
+            }
+
+            months.forEach((month, i) => {
+                const x = chartX + (chartWidth / (months.length - 1)) * i;
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(month, x, chartY + chartHeight + 45);
+            });
+
+            const colors = {
+                'KCTR': '#e76f51',
+                'KSCCZ': '#f4a261',
+                'KSCE': '#e9c46a'
+            };
+
+            Object.keys(salesData).forEach(corp => {
+                ctx.strokeStyle = colors[corp];
+                ctx.lineWidth = 5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.shadowColor = colors[corp];
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+
+                salesData[corp].forEach((value, i) => {
+                    const x = chartX + (chartWidth / (months.length - 1)) * i;
+                    const y = chartY + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                salesData[corp].forEach((value, i) => {
+                    const x = chartX + (chartWidth / (months.length - 1)) * i;
+                    const y = chartY + chartHeight - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+
+                    ctx.fillStyle = colors[corp];
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#264653';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                });
+            });
+
+            const legendY = chartY + chartHeight + 100;
+            const legendItems = [
+                { corp: 'KCTR', color: colors.KCTR, label: 'KCTR (터키)' },
+                { corp: 'KSCCZ', color: colors.KSCCZ, label: 'KSCCZ (체코)' },
+                { corp: 'KSCE', color: colors.KSCE, label: 'KSCE (이집트)' }
+            ];
+
+            legendItems.forEach((item, i) => {
+                const x = canvas.width / 2 - 350 + i * 280;
+
+                ctx.strokeStyle = item.color;
+                ctx.lineWidth = 5;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(x, legendY);
+                ctx.lineTo(x + 80, legendY);
+                ctx.stroke();
+
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                ctx.arc(x + 40, legendY, 8, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#264653';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.fillStyle = '#e9c46a';
+                ctx.font = 'bold 28px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(item.label, x + 95, legendY + 10);
+            });
+        }
+
+        // Helper functions
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function adjustBrightness(hex, percent) {
+            const num = parseInt(hex.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+            const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+            const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+            return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+        }
+
+        function downloadAll() {
+            const canvases = [
+                { id: 'canvas1', name: 'chart1_sales_comparison.png' },
+                { id: 'canvas2', name: 'chart2_integrated_comparison.png' },
+                { id: 'canvas3', name: 'chart3_profit_rate_ranking.png' },
+                { id: 'canvas4', name: 'chart4_monthly_trend.png' }
+            ];
+
+            canvases.forEach((item, index) => {
+                setTimeout(() => {
+                    const canvas = document.getElementById(item.id);
+                    canvas.toBlob(function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = item.name;
+                        a.click();
+                    });
+                }, index * 500);
+            });
+        }
+
+        // Draw all charts on load
+        window.onload = function() {
+            drawChart1();
+            drawChart2();
+            drawChart3();
+            drawChart4();
+        };
+    </script>
+</body>
+</html>

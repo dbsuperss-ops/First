@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>이익률 순위 - Sunset Boulevard</title>
+</head>
+<body style="background-color: #264653; margin: 0; padding: 0;">
+    <canvas id="canvas" width="1920" height="1080"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#264653';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const data = [
+            { name: 'KCTR', rate: 10.78, sales: 74249076468, profit: 8000378122 },
+            { name: 'KSCCZ', rate: 5.91, sales: 75538696833, profit: 4466501643 },
+            { name: 'KSCE', rate: -7.42, sales: 672678015658, profit: -49887720827 }
+        ].sort((a, b) => b.rate - a.rate);
+
+        ctx.fillStyle = '#e76f51';
+        ctx.font = 'bold 56px "DejaVu Serif", serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('사업장별 이익률 순위', canvas.width / 2, 100);
+
+        ctx.fillStyle = '#e9c46a';
+        ctx.font = '32px "DejaVu Sans", sans-serif';
+        ctx.fillText('2026년 연간 실적 기준', canvas.width / 2, 160);
+
+        const chartX = 320;
+        const chartY = 280;
+        const barHeight = 140;
+        const spacing = 100;
+        const maxBarWidth = 1200;
+
+        const rankColors = ['#e76f51', '#f4a261', '#e9c46a'];
+
+        data.forEach((item, index) => {
+            const y = chartY + index * (barHeight + spacing);
+
+            const absMaxRate = 15;
+            const barWidth = Math.abs(item.rate / absMaxRate) * maxBarWidth;
+            const isNegative = item.rate < 0;
+
+            const gradient = ctx.createLinearGradient(chartX, y, chartX + barWidth, y);
+            const color = rankColors[index];
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(1, adjustBrightness(color, -30));
+
+            ctx.fillStyle = gradient;
+            roundRect(ctx, chartX, y, barWidth, barHeight, 12);
+            ctx.fill();
+
+            ctx.strokeStyle = '#264653';
+            ctx.lineWidth = 4;
+            roundRect(ctx, chartX, y, barWidth, barHeight, 12);
+            ctx.stroke();
+
+            // Rank medal
+            ctx.fillStyle = '#264653';
+            ctx.beginPath();
+            ctx.arc(chartX - 100, y + barHeight / 2, 50, 0, 2 * Math.PI);
+            ctx.fill();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 6;
+            ctx.stroke();
+
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = 'bold 48px "DejaVu Serif", serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${index + 1}`, chartX - 100, y + barHeight / 2 + 18);
+
+            // Company name
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = 'bold 48px "DejaVu Serif", serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(item.name, chartX - 140, y + barHeight / 2 + 18);
+
+            // Rate on bar
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 52px "DejaVu Sans", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${item.rate.toFixed(2)}%`, chartX + 30, y + barHeight / 2 + 18);
+
+            // Details
+            ctx.fillStyle = '#e9c46a';
+            ctx.font = '28px "DejaVu Sans", sans-serif';
+            ctx.textAlign = 'left';
+            const salesLabel = `매출: ${Math.round(item.sales / 100000000).toLocaleString()}억원`;
+            const profitLabel = `영업이익: ${Math.round(item.profit / 100000000).toLocaleString()}억원`;
+            ctx.fillText(salesLabel, chartX + barWidth + 40, y + 55);
+            ctx.fillText(profitLabel, chartX + barWidth + 40, y + 105);
+        });
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function adjustBrightness(hex, percent) {
+            const num = parseInt(hex.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+            const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+            const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+            return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+        }
+
+        canvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'chart3_profit_rate_ranking_sunset.png';
+            a.click();
+        });
+    </script>
+</body>
+</html>
