@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Read(//home/gabriel/.claude/plugins/marketplaces/anthropic-agent-skills/skills/theme-factory/**)",
-      "Bash(dotnet build -c Release)"
+      "Bash(dotnet build -c Release)",
+      "Read(//mnt/c/Users/**)",
+      "Bash(claude doctor:*)",
+      "Bash(npm i:*)",
+      "Bash(sudo npm:*)"
     ],
     "deny": [],
     "ask": []
