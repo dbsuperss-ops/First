@@ -42,9 +42,33 @@
                             <TextBlock Text="📂 폴더를 여기에 드래그하거나"
                                        HorizontalAlignment="Center"
                                        Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <Button Classes="secondary" Content="폴더 추가…"
+                            <Button Classes="secondary" Content="폴더 추가… (Ctrl+클릭으로 복수 선택)"
                                     HorizontalAlignment="Center"
                                     Click="BrowseIncludeFolder_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 경로 직접 입력 -->
+                    <Border CornerRadius="6" BorderThickness="1"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            Background="#FAFAFA" Padding="8">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="muted" FontSize="12"
+                                       Text="또는 경로 직접 입력 (줄바꿈 또는 ; 로 구분하여 여러 경로 동시 추가)"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding IncludePathInput}"
+                                         Watermark="예) C:\Users\문서&#10;D:\프로젝트"
+                                         AcceptsReturn="True"
+                                         MinHeight="60"
+                                         MaxHeight="120"
+                                         TextWrapping="Wrap"/>
+                                <Button Grid.Column="1"
+                                        Classes="secondary"
+                                        Content="추가"
+                                        VerticalAlignment="Top"
+                                        Command="{Binding AddIncludePathsFromInputCommand}"/>
+                            </Grid>
                         </StackPanel>
                     </Border>
 
@@ -86,9 +110,33 @@
                             <TextBlock Text="🚫 제외할 폴더를 드래그하거나"
                                        HorizontalAlignment="Center"
                                        Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <Button Classes="secondary" Content="제외 폴더 추가…"
+                            <Button Classes="secondary" Content="제외 폴더 추가… (Ctrl+클릭으로 복수 선택)"
                                     HorizontalAlignment="Center"
                                     Click="BrowseExcludeFolder_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 경로 직접 입력 -->
+                    <Border CornerRadius="6" BorderThickness="1"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            Background="#FAFAFA" Padding="8">
+                        <StackPanel Spacing="6">
+                            <TextBlock Classes="muted" FontSize="12"
+                                       Text="또는 경로 직접 입력 (줄바꿈 또는 ; 로 구분)"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding ExcludePathInput}"
+                                         Watermark="예) C:\Windows\Temp"
+                                         AcceptsReturn="True"
+                                         MinHeight="48"
+                                         MaxHeight="100"
+                                         TextWrapping="Wrap"/>
+                                <Button Grid.Column="1"
+                                        Classes="secondary"
+                                        Content="추가"
+                                        VerticalAlignment="Top"
+                                        Command="{Binding AddExcludePathsFromInputCommand}"/>
+                            </Grid>
                         </StackPanel>
                     </Border>
 

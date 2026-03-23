@@ -55,6 +55,10 @@ public sealed partial class DuplicateScanViewModel : ViewModelBase
     // ── Job meta ─────────────────────────────────────────────────────────
     [ObservableProperty] private string _scanName = $"스캔 {DateTime.Now:yyyy-MM-dd HH:mm}";
 
+    // ── Path text input (batch) ───────────────────────────────────────────
+    [ObservableProperty] private string _includePathInput = string.Empty;
+    [ObservableProperty] private string _excludePathInput = string.Empty;
+
     // ── Validation ────────────────────────────────────────────────────────
     [ObservableProperty] private string _validationError = string.Empty;
     [ObservableProperty] private bool   _hasValidationError;
@@ -87,6 +91,25 @@ public sealed partial class DuplicateScanViewModel : ViewModelBase
 
     [RelayCommand]
     private void RemoveExcludePath(string path) => ExcludePaths.Remove(path);
+
+    [RelayCommand]
+    private void AddIncludePathsFromInput()
+    {
+        foreach (var path in SplitPaths(IncludePathInput))
+            AddIncludePath(path);
+        IncludePathInput = string.Empty;
+    }
+
+    [RelayCommand]
+    private void AddExcludePathsFromInput()
+    {
+        foreach (var path in SplitPaths(ExcludePathInput))
+            AddExcludePath(path);
+        ExcludePathInput = string.Empty;
+    }
+
+    private static IEnumerable<string> SplitPaths(string raw) =>
+        raw.Split(['\n', '\r', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     // ── File-type commands ────────────────────────────────────────────────
     [RelayCommand]
@@ -163,6 +186,8 @@ public sealed partial class DuplicateScanViewModel : ViewModelBase
         ScanName = $"스캔 {DateTime.Now:yyyy-MM-dd HH:mm}";
         IncludePaths.Clear();
         ExcludePaths.Clear();
+        IncludePathInput     = string.Empty;
+        ExcludePathInput     = string.Empty;
         IncludeExtensionsRaw = string.Empty;
         ExcludeExtensionsRaw = string.Empty;
         IncludeKeywordsRaw   = string.Empty;
