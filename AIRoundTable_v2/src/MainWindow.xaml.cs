@@ -17,12 +17,10 @@ public partial class MainWindow : Window
     private string   _activeSender = "나";
 
     // ── 발언자 버튼 상태 테이블 ─────────────────────────────────────────────
-    // (컨테이너 Border, 텍스트 Label, 활성색, 활성전경, 비활성색, 비활성전경)
     private record SenderStyle(
         Border    Btn, TextBlock Lbl,
         string    ActiveBg,   string ActiveFg,
-        string    InactiveBg, string InactiveFg,
-        bool      IsCircle);   // true = "나" 원형 버튼
+        string    InactiveBg, string InactiveFg);
 
     private IReadOnlyList<SenderStyle> _senderStyles = null!;
 
@@ -35,6 +33,9 @@ public partial class MainWindow : Window
 
         _sessionListBox.ItemsSource = _sessions;
         _messageList.ItemsSource    = _messages;
+
+        UpdateSenderButtonStates();
+        SetActiveTab(showConversation: true);
 
         LoadSampleData();
 
@@ -81,6 +82,20 @@ public partial class MainWindow : Window
         });
     }
 
+    // ── 탭 전환 ────────────────────────────────────────────────────────────
+    private void TabConversation_Click(object sender, RoutedEventArgs e) => SetActiveTab(true);
+    private void TabParticipants_Click(object sender, RoutedEventArgs e) => SetActiveTab(false);
+
+    private void SetActiveTab(bool showConversation)
+    {
+        _messageScrollViewer.Visibility = showConversation ? Visibility.Visible   : Visibility.Collapsed;
+        _participantsView.Visibility    = showConversation ? Visibility.Collapsed : Visibility.Visible;
+        _inputArea.Visibility           = showConversation ? Visibility.Visible   : Visibility.Collapsed;
+
+        _tabConversation.Style = (Style)FindResource(showConversation ? "ActiveTabButtonStyle" : "OutlineButtonStyle");
+        _tabParticipants.Style = (Style)FindResource(showConversation ? "OutlineButtonStyle"   : "ActiveTabButtonStyle");
+    }
+
     // ── 세션 선택 ──────────────────────────────────────────────────────────
     private void SessionListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -110,6 +125,58 @@ public partial class MainWindow : Window
         };
         _sessions.Insert(0, session);
         _sessionListBox.SelectedItem = session;
+    }
+
+    // ── 세션 컨텍스트 메뉴 ─────────────────────────────────────────────────
+    private void RenameSession_Click(object sender, RoutedEventArgs e)
+    {
+        var session = GetContextMenuSession(sender);
+        if (session is null) return;
+
+        string? name = ShowInputDialog("이름 편집", "새 이름을 입력하시오:", session.Name);
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        session.Name = name.Trim();
+        if (_currentSession == session)
+            _sessionTitle.Text = session.Name;
+    }
+
+    private void DeleteSession_Click(object sender, RoutedEventArgs e)
+    {
+        var session = GetContextMenuSession(sender);
+        if (session is null) return;
+
+        var result = MessageBox.Show(
+            $"'{session.Name}' 세션을 삭제하시겠소?",
+            "세션 삭제",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes) return;
+
+        if (_currentSession == session)
+        {
+            _currentSession    = null;
+            _sessionTitle.Text = "세션을 선택하시오";
+            _sessionDesc.Text  = "";
+            _messages.Clear();
+        }
+        _sessions.Remove(session);
+    }
+
+    // ── 메시지 컨텍스트 메뉴 ───────────────────────────────────────────────
+    private void CopyMessage_Click(object sender, RoutedEventArgs e)
+    {
+        var vm = GetContextMenuMessage(sender);
+        if (vm is null) return;
+        Clipboard.SetText(vm.Content);
+    }
+
+    private void DeleteMessage_Click(object sender, RoutedEventArgs e)
+    {
+        var vm = GetContextMenuMessage(sender);
+        if (vm is null || _currentSession is null) return;
+        _currentSession.Messages.Remove(vm.Source);
+        _messages.Remove(vm);
     }
 
     // ── 발언자 버튼 클릭 ───────────────────────────────────────────────────
@@ -155,7 +222,11 @@ public partial class MainWindow : Window
     // ── 메시지 추가 ────────────────────────────────────────────────────────
     private void AddMessage()
     {
-        if (_currentSession is null) return;
+        if (_currentSession is null)
+        {
+            MessageBox.Show("먼저 세션을 선택하시오.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
         string text = _inputTextBox.Text.Trim();
         if (string.IsNullOrEmpty(text)) return;
@@ -186,6 +257,11 @@ public partial class MainWindow : Window
         if (dlg.ShowDialog() != true) return;
 
         var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"# {_currentSession.Name}");
+        sb.AppendLine($"# {_currentSession.Description}");
+        sb.AppendLine($"# 저장일시: {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine();
+
         foreach (var msg in _currentSession.Messages)
         {
             sb.AppendLine($"[{msg.Sender}] {msg.Timestamp:yyyy-MM-dd HH:mm}");
@@ -213,14 +289,29 @@ public partial class MainWindow : Window
     private IReadOnlyList<SenderStyle> BuildSenderStyles() => new[]
     {
         new SenderStyle(_senderMeBtn,      _senderMeLbl,
-                        "#7C3AED", "White",   "#F3F4F6", "#6B7280", true),
+                        "#7C3AED", "White",   "#F3F4F6", "#6B7280"),
         new SenderStyle(_senderGeminiBtn,  _senderGeminiLbl,
-                        "#10B981", "White",   "#D1FAE5", "#065F46", false),
+                        "#10B981", "White",   "#D1FAE5", "#065F46"),
         new SenderStyle(_senderCopilotBtn, _senderCopilotLbl,
-                        "#3B82F6", "White",   "#DBEAFE", "#1D4ED8", false),
+                        "#3B82F6", "White",   "#DBEAFE", "#1D4ED8"),
         new SenderStyle(_senderClaudeBtn,  _senderClaudeLbl,
-                        "#F59E0B", "White",   "#FEF3C7", "#92400E", false),
+                        "#F59E0B", "White",   "#FEF3C7", "#92400E"),
     };
+
+    // ── 컨텍스트 메뉴 헬퍼 ────────────────────────────────────────────────
+    private static Session? GetContextMenuSession(object sender)
+    {
+        var mi = (MenuItem)sender;
+        var cm = (ContextMenu)mi.Parent;
+        return (cm.PlacementTarget as FrameworkElement)?.DataContext as Session;
+    }
+
+    private static MessageViewModel? GetContextMenuMessage(object sender)
+    {
+        var mi = (MenuItem)sender;
+        var cm = (ContextMenu)mi.Parent;
+        return (cm.PlacementTarget as FrameworkElement)?.DataContext as MessageViewModel;
+    }
 
     // ── 간단한 입력 다이얼로그 ─────────────────────────────────────────────
     private string? ShowInputDialog(string title, string prompt, string defaultValue = "")
