@@ -41,10 +41,21 @@ public sealed partial class ScanHistoryViewModel : ViewModelBase
         ApplyFilter();
     }
 
+    private static ScanJobStatus? ParseStatusFilter(string filter) => filter switch
+    {
+        "완료"   => ScanJobStatus.Completed,
+        "실행 중" => ScanJobStatus.Running,
+        "취소됨"  => ScanJobStatus.Cancelled,
+        "실패"   => ScanJobStatus.Failed,
+        _        => null
+    };
+
     private void ApplyFilter()
     {
         var jobs = _scanJobService.GetAllJobs()
             .OrderByDescending(j => j.CreatedAt);
+
+        var statusFilter = ParseStatusFilter(SelectedStatusFilter);
 
         Items.Clear();
         foreach (var job in jobs)
@@ -53,8 +64,7 @@ public sealed partial class ScanHistoryViewModel : ViewModelBase
                 !job.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (SelectedStatusFilter != "All" &&
-                !job.Status.ToString().Equals(SelectedStatusFilter, StringComparison.OrdinalIgnoreCase))
+            if (statusFilter.HasValue && job.Status != statusFilter.Value)
                 continue;
 
             Items.Add(new ScanHistoryItemViewModel(job));
@@ -74,13 +84,20 @@ public sealed class ScanHistoryItemViewModel(ScanJob job)
     public ScanJob Job => job;
 
     public string Name      => job.Name;
-    public string Status    => job.Status.ToString();
+    public string Status => job.Status switch
+    {
+        ScanJobStatus.Completed => "완료",
+        ScanJobStatus.Running   => "실행 중",
+        ScanJobStatus.Cancelled => "취소됨",
+        ScanJobStatus.Failed    => "실패",
+        _                       => job.Status.ToString()
+    };
     public string CreatedAt => job.CreatedAt.ToString("g");
     public string Paths     => job.PathsSummary;
     public string FileTypes => job.FileTypesSummary;
 
     public string ResultSummary => job.Result is { } r
-        ? $"{r.DuplicateGroups.Count} duplicate groups · {FormatBytes(r.TotalWastedBytes)} wasted · {r.FilesScanned} files scanned"
+        ? $"중복 그룹 {r.DuplicateGroups.Count}개 · 낭비 {FormatBytes(r.TotalWastedBytes)} · {r.FilesScanned}개 파일 스캔"
         : job.ErrorMessage ?? string.Empty;
 
     public string Duration => job.Result is { } r

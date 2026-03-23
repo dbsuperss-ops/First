@@ -35,7 +35,7 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
             }));
     }
 
-    partial void OnIsExpandedChanged(bool _) => OnPropertyChanged(nameof(ExpandIcon));
+    partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(ExpandIcon));
 
     [RelayCommand]
     private void ToggleExpanded() => IsExpanded = !IsExpanded;

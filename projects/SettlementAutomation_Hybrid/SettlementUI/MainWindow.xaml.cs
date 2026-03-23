@@ -117,6 +117,8 @@ namespace SettlementUI
 
         private void YearCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
+            // Guard: SelectionChanged fires during InitializeComponent before named fields are assigned
+            if (RateUSD is null) return;
             string year = (YearCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "2026";
             LoadRates(year);
         }
@@ -188,8 +190,6 @@ namespace SettlementUI
 
             string year = (YearCombo.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "2026";
 
-            SaveRates(year);
-
             _isRunning = true;
             _lastOutputDir = null;
             OpenOutputBtn.IsEnabled = false;
@@ -205,6 +205,8 @@ namespace SettlementUI
 
             try
             {
+                SaveRates(year);
+
                 ProcessStartInfo psi;
                 if (useBundled)
                 {

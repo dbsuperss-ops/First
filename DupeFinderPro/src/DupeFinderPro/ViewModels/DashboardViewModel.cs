@@ -131,7 +131,14 @@ public sealed partial class DashboardViewModel : ViewModelBase
         {
             HasRecentScan = true;
             RecentScanName = latest.Name;
-            RecentScanStatus = latest.Status.ToString();
+            RecentScanStatus = latest.Status switch
+            {
+                ScanJobStatus.Completed => "완료",
+                ScanJobStatus.Running   => "실행 중",
+                ScanJobStatus.Cancelled => "취소됨",
+                ScanJobStatus.Failed    => "실패",
+                _                       => latest.Status.ToString()
+            };
             LastScanTime = latest.CreatedAt.ToString("g");
             RecentScanSummary = latest.Result is { } r
                 ? $"{r.DuplicateGroups.Count}개 그룹 · {FormatBytes(r.TotalWastedBytes)} 낭비"
@@ -160,7 +167,14 @@ public sealed partial class DashboardViewModel : ViewModelBase
 public sealed class ScanJobSummaryViewModel(ScanJob job)
 {
     public string Name       => job.Name;
-    public string Status     => job.Status.ToString();
+    public string Status     => job.Status switch
+    {
+        ScanJobStatus.Completed => "완료",
+        ScanJobStatus.Running   => "실행 중",
+        ScanJobStatus.Cancelled => "취소됨",
+        ScanJobStatus.Failed    => "실패",
+        _                       => job.Status.ToString()
+    };
     public string CreatedAt  => job.CreatedAt.ToString("g");
     public string Summary    => job.Result is { } r
         ? $"{r.DuplicateGroups.Count}개 그룹 · {FormatBytes(r.TotalWastedBytes)} 낭비"
