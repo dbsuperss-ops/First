@@ -18,9 +18,28 @@ namespace KscRefinerLauncher
 
             if (!File.Exists(enginePath))
             {
+                // 디버그 정보 포함
+                string debugInfo = $"Engine file not found:\n{enginePath}\n\n";
+                debugInfo += $"Current Directory: {Directory.GetCurrentDirectory()}\n";
+                debugInfo += $"Base Directory: {exeDir}\n\n";
+                debugInfo += "Files in directory:\n";
+
+                try
+                {
+                    var files = Directory.GetFiles(exeDir, "*.exe");
+                    foreach (var f in files)
+                    {
+                        debugInfo += $"  - {Path.GetFileName(f)}\n";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    debugInfo += $"Error listing files: {ex.Message}";
+                }
+
                 MessageBox.Show(
-                    $"엔진 파일을 찾을 수 없습니다:\n{enginePath}",
-                    "KSC Refiner v1.3",
+                    debugInfo,
+                    "KSC Refiner v1.3 - Debug Info",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error
                 );
