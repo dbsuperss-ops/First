@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from dataclasses import dataclass, asdict
 from typing import Optional
 
@@ -32,7 +33,15 @@ class AccountRow:
 
 def load_rates(year: str, config_dir: str = None) -> dict:
     if config_dir is None:
-        config_dir = os.path.join(os.path.dirname(__file__), "config")
+        # PyInstaller 실행 시 번들 리소스 경로 사용
+        if getattr(sys, 'frozen', False):
+            # PyInstaller로 패키징된 경우
+            base_path = sys._MEIPASS
+        else:
+            # 일반 Python 실행 시
+            base_path = os.path.dirname(__file__)
+        config_dir = os.path.join(base_path, "config")
+
     path = os.path.join(config_dir, "rates.json")
     with open(path, "r", encoding="utf-8") as f:
         all_rates = json.load(f)

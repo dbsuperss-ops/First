@@ -1,0 +1,26 @@
+# Python build
+ksc_refiner/build/
+ksc_refiner/dist/
+ksc_refiner/__pycache__/
+ksc_refiner/**/__pycache__/
+ksc_refiner/**/*.pyc
+ksc_refiner/venv/
+
+# Output files
+ksc_refiner/output/*.xlsx
+ksc_refiner/C:*
+
+# Installer
+installer_staging/
+installer_output/
+
+# Temp files
+*.log
+nul
+~$*.xlsx
+*.Zone.Identifier
+
+# C# build
+ksc_launcher/bin/
+ksc_launcher/obj/
+publish/

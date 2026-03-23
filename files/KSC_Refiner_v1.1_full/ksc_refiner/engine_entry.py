@@ -16,15 +16,22 @@ else:
 os.environ['KSC_CONFIG_DIR'] = os.path.join(_BASE_DIR, 'config')
 os.environ['KSC_OUTPUT_DIR'] = os.path.join(_BASE_DIR, 'output')
 
-# stdout UTF-8 강제 설정
+# stdout UTF-8 강제 설정 (Windows cp949 에러 방지)
 if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
-
-# 패키지 내부 모듈 경로 추가 (onedir 모드에서 필요)
-if getattr(sys, 'frozen', False):
-    sys.path.insert(0, os.path.join(sys._MEIPASS, 'ksc_refiner'))  # type: ignore
-    sys.path.insert(0, sys._MEIPASS)                               # type: ignore
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        # reconfigure 실패 시 wrapper로 감싸기
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+else:
+    # Python 3.6 이하 또는 stdout이 buffer가 없는 경우
+    import io
+    if hasattr(sys.stdout, 'buffer'):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
 
 from engine import main  # noqa: E402
 

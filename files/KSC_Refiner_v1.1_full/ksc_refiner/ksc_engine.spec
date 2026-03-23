@@ -11,7 +11,8 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        ('config/rates.json', 'config'),   # 환율 설정 번들
+        ('config/rates.json', 'config'),    # 환율 설정 번들
+        ('config/settings.json', 'config'), # 설정 파일 번들
     ],
     hiddenimports=[
         'openpyxl',

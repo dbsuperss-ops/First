@@ -80,8 +80,8 @@ namespace SettlementUI
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = System.Text.Encoding.UTF8
+                    CreateNoWindow = true
+                    // StandardOutputEncoding은 자동으로 UTF8 사용됨 (명시 불필요)
                 };
 
                 Process? process = Process.Start(start);

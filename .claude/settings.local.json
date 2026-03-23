@@ -1,20 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Read(//home/gabriel/.claude/plugins/marketplaces/anthropic-agent-skills/skills/theme-factory/**)",
-      "Bash(dotnet build -c Release)",
-      "Read(//mnt/c/Users/**)",
-      "Bash(claude doctor:*)",
-      "Bash(npm i:*)",
-      "Bash(sudo npm:*)",
-      "Bash(claude update:*)",
-      "Bash(npm --version)",
-      "Bash(curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh)",
-      "Bash(bash)",
-      "Bash(head -5 find /mnt/c/Users -name python*.exe)",
-      "Bash(cmd.exe /c \"C:\\\\Python314\\\\python.exe --version\")",
-      "Bash(powershell.exe -Command \"python --version\")",
-      "Bash(\"/mnt/c/Program Files/dotnet/dotnet.exe\" --version)"
+      "Bash(git add README.md files/KSC_Refiner_v1.1_full/ksc_refiner/engine.py files/KSC_Refiner_v1.1_full/ksc_refiner/parsers/*.py files/KSC_Refiner_v1.1_full/ksc_refiner/config/settings.json)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Fix all parser sheet name detection and improve data extraction\n\nMajor improvements to parser reliability and data extraction:\n\nParser Enhancements:\n- KSCP: Add support for ''월종합'', ''보고용자료'', ''사업계획'' sheets\n- KCTR: Add ''★PL(Report)'' support with cumulative format parsing, English account names\n- KSCE: Add ''PL(KR)'', ''PL(Report)'', ''PL2026(KR)'' sheet detection\n- All parsers: Flexible sheet name matching for different file formats\n\nEngine Improvements:\n- Fix output path handling for cross-platform compatibility\n- Normalize Windows paths when running on Linux/WSL\n- Improve settings.json path resolution\n\nResults:\n- Total extracted: 748 records across 5 entities\n- KSCP: 360 records (252 actual + 108 plan)\n- KCTR: 75 records (9 actual + 66 plan)\n- KSCCZ: 125 records (29 actual + 96 plan)\n- KSCE: 96 records (40 actual + 56 plan)\n- KSCI: 92 records (20 actual + 72 plan)\n\nDocumentation:\n- Update README with comprehensive file format documentation\n- Add supported sheet names for each entity\n- Add version history and changelog\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(pip3 install pyinstaller)",
+      "Bash(python3 -m venv venv)",
+      "Bash(source venv/bin/activate)",
+      "Bash(pip install pyinstaller openpyxl)",
+      "Bash(pip3 install --user pyinstaller)",
+      "Bash(pip3 install --break-system-packages pyinstaller)",
+      "Bash(python3 -m PyInstaller ksc_engine.spec --noconfirm)",
+      "Bash(./ksc_engine /home/gabriel/first/files 2026)",
+      "Bash(cp -r KSC_Refiner_v1.1_full KSC_Refiner_v1.2)",
+      "Bash(python3 engine.py /home/gabriel/first/files 2026)",
+      "Bash(git add files/KSC_Refiner_v1.2)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Create v1.2 release with updated project names\n\nVersion Management (Following Project Policy):\n- Create new KSC_Refiner_v1.2 folder from v1.1\n- Preserve v1.1 folder for version history\n\nProject Name Updates:\n- ksc_launcher: AssemblyName → KscRefiner_v1.2\n- ksc_setup: AssemblyName → KscRefiner_Setup_v1.2\n- All projects: Version → 1.2.0\n\nConfiguration:\n- Add .gitignore for build outputs\n- Engine version already set to v1.2\n- Inno Setup version set to 1.2.0\n\nTesting:\n- ✅ Python engine test passed (748 records)\n- ✅ All parsers working correctly\n- ✅ Version display: \"KSC Settlement Refiner Engine v1.2\"\n\nReady for Windows Build:\n- Run build.bat on Windows to create:\n  - ksc_engine.exe (Python engine)\n  - KscRefiner_v1.2.exe (C# launcher)\n  - KscRefiner_Setup_v1.2.0.exe (installer)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
