@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <AssemblyName>KscRefiner_Setup_v1.3</AssemblyName>
+    <Version>1.3.0</Version>
+    <Authors>KSC Group</Authors>
+    <Company>KSC Group</Company>
+    <Product>KSC Settlement Refiner Setup</Product>
+    <Copyright>Copyright © 2024-2026 KSC Group</Copyright>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+</Project>
