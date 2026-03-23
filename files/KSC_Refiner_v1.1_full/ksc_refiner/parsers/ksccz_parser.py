@@ -108,22 +108,36 @@ class KscczParser(BaseParser):
 
             for row_num, (cat, sub, account) in KSCCZ_PLAN_PL_MAP.items():
                 val = safe_float(ws_pl.cell(row=row_num, column=col).value)
-                rows.append(self.make_row(ym, "KSCCZ", cat, sub, account, "RMB", val))
+                rows.append(self.make_row(ym, "KSCCZ", cat, sub, account, "RMB", val, data_type="계획"))
 
-            # 영업이익 = 매출총이익 - 판관비계
-            op_profit = (
-                safe_float(ws_pl.cell(row=22, column=col).value) -
-                safe_float(ws_pl.cell(row=24, column=col).value)
-            )
-            rows.append(self.make_row(ym, "KSCCZ", CATEGORY_PL, "이익", "영업이익", "RMB", op_profit))
+            # 영업이익: 시트에 직접 값이 있는 경우 우선 사용, 없으면 매출총이익 - 판관비계 계산
+            op_profit = self._find_plan_op_profit(ws_pl, col)
+            rows.append(self.make_row(ym, "KSCCZ", CATEGORY_PL, "이익", "영업이익", "RMB", op_profit, data_type="계획"))
 
             if "제조원가계획" in wb.sheetnames:
                 ws_mc = wb["제조원가계획"]
                 for row_num, (cat, sub, account) in KSCCZ_PLAN_MC_MAP.items():
                     val = safe_float(ws_mc.cell(row=row_num, column=col).value)
-                    rows.append(self.make_row(ym, "KSCCZ", cat, sub, account, "RMB", val))
+                    rows.append(self.make_row(ym, "KSCCZ", cat, sub, account, "RMB", val, data_type="계획"))
 
         return rows
+
+    def _find_plan_op_profit(self, ws_pl, col) -> float:
+        """손익계획 시트에서 영업이익 값을 찾음.
+        1) '营业利润' 또는 '영업이익' 레이블 행을 탐색해 직접 읽음.
+        2) 못 찾으면 row22(매출총이익) - row24(판관비계) 계산값 반환."""
+        search_keywords = ["营业利润", "영업이익", "营业利润合计"]
+        for r in range(1, min(ws_pl.max_row + 1, 60)):
+            label = ws_pl.cell(row=r, column=1).value or ws_pl.cell(row=r, column=2).value
+            if label and any(kw in str(label) for kw in search_keywords):
+                val = safe_float(ws_pl.cell(row=r, column=col).value)
+                print(f"    📌 영업이익 행 발견 (row {r}): {val}")
+                return val
+        # 레이블 미발견 → 계산
+        gp = safe_float(ws_pl.cell(row=22, column=col).value)
+        sga = safe_float(ws_pl.cell(row=24, column=col).value)
+        print(f"    ⚠️ 영업이익 행 미발견 → 매출총이익({gp}) - 판관비({sga}) = {gp - sga}")
+        return gp - sga
 
     def _detect_month(self, ws) -> int:
         val = ws.cell(row=1, column=2).value

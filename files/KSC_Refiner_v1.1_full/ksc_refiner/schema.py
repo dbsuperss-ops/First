@@ -4,7 +4,7 @@ from dataclasses import dataclass, asdict
 from typing import Optional
 
 MASTER_COLUMNS = [
-    "귀속연월", "법인코드", "대분류", "중분류", "계정과목",
+    "귀속연월", "법인코드", "데이터타입", "대분류", "중분류", "계정과목",
     "현지통화", "현지금액", "적용환율", "KRW금액"
 ]
 
@@ -15,6 +15,7 @@ CATEGORY_MC = "MC"
 class AccountRow:
     귀속연월: str
     법인코드: str
+    데이터타입: str      # "실적" or "계획"
     대분류: str
     중분류: str
     계정과목: str
@@ -25,7 +26,7 @@ class AccountRow:
 
     def to_list(self):
         return [
-            self.귀속연월, self.법인코드, self.대분류, self.중분류,
+            self.귀속연월, self.법인코드, self.데이터타입, self.대분류, self.중분류,
             self.계정과목, self.현지통화, self.현지금액, self.적용환율, self.KRW금액
         ]
 

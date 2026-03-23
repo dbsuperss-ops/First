@@ -43,15 +43,28 @@ class KctrParser(BaseParser):
         wb = openpyxl.load_workbook(self.filepath, read_only=True, data_only=True)
         rows = []
 
-        if "KCTR 실적" not in wb.sheetnames:
+        # 결산 시트 찾기: KCTR 실적, ★PL(Report), PL 등
+        settlement_sheet = None
+        for candidate in ["KCTR 실적", "★PL(Report)", "PL"]:
+            if candidate in wb.sheetnames:
+                settlement_sheet = candidate
+                break
+
+        if not settlement_sheet:
             if "Summary" in wb.sheetnames:
                 rows = self._extract_plan(wb)
             else:
-                print(f"  [KCTR] 지원 시트 없음 (KCTR 실적, Summary 모두 없음) — 건너뜀")
+                print(f"  [KCTR] 지원 시트 없음 — 건너뜀")
             wb.close()
             return rows
 
-        ws_pl = wb["KCTR 실적"]
+        # ★PL(Report)인 경우 특별 처리
+        if settlement_sheet == "★PL(Report)":
+            rows = self._extract_from_pl_report(wb)
+            wb.close()
+            return rows
+
+        ws_pl = wb[settlement_sheet]
         year = self._detect_year(ws_pl)
         pl_map = dict(KCTR_PL_MAP)
 
@@ -111,6 +124,56 @@ class KctrParser(BaseParser):
                 report_rows.append(self.make_row(ym, "KCTR", CATEGORY_MC, "경비", "제조경비계", "TRY", actual_val))
         return report_rows
 
+    def _extract_from_pl_report(self, wb) -> List[AccountRow]:
+        """★PL(Report) 시트에서 월별 누적 실적 데이터 추출"""
+        ws = wb["★PL(Report)"]
+        year = self._detect_year(ws)
+        rows = []
+
+        # Row 4에서 월 정보 읽기 (Col 3)
+        month_val = ws.cell(row=4, column=3).value
+        if month_val is None:
+            return rows
+
+        month_num = int(safe_float(month_val))
+        if month_num == 0 or month_num > 12:
+            return rows
+
+        ym = f"{year}-{month_num:02d}"
+
+        # ★PL(Report)는 누적 실적이 Col 5 (Accumulated Actual)에 있음
+        # 주요 계정과목 매핑
+        pl_report_map = {
+            6:  (CATEGORY_PL, "매출", "매출액"),          # Ⅰ. 매출액
+            7:  (CATEGORY_PL, "매출", "상품매출"),        # 1. 상품 매출
+            # 매출원가는 별도 섹션에 있을 수 있음 - 동적으로 찾아야 함
+        }
+
+        # 계정과목을 행 레이블로 찾기
+        for r in range(6, min(ws.max_row + 1, 70)):
+            label_col2 = ws.cell(row=r, column=2).value
+            if not label_col2:
+                continue
+
+            label_str = str(label_col2).strip()
+            actual_val = safe_float(ws.cell(row=r, column=5).value)  # Col 5 = Accumulated Actual
+
+            # PL 계정 매칭
+            if "매출액" in label_str or "SALES" in label_str.upper():
+                rows.append(self.make_row(ym, "KCTR", CATEGORY_PL, "매출", "매출액", "TRY", actual_val))
+            elif "상품 매출" in label_str or "MERCHANDISE" in label_str.upper():
+                rows.append(self.make_row(ym, "KCTR", CATEGORY_PL, "매출", "상품매출", "TRY", actual_val))
+            elif "매출원가" in label_str or "COST OF SALES" in label_str.upper():
+                rows.append(self.make_row(ym, "KCTR", CATEGORY_PL, "매출원가", "매출원가", "TRY", actual_val))
+            elif "매출총이익" in label_str or "GROSS PROFIT" in label_str.upper():
+                rows.append(self.make_row(ym, "KCTR", CATEGORY_PL, "이익", "매출총이익", "TRY", actual_val))
+            elif "판관비" in label_str or ("OPERATING" in label_str.upper() and "EXPENSE" in label_str.upper()):
+                rows.append(self.make_row(ym, "KCTR", CATEGORY_PL, "판관비", "판관비계", "TRY", actual_val))
+            elif "영업이익" in label_str or "OPERATING PROFIT" in label_str.upper():
+                rows.append(self.make_row(ym, "KCTR", CATEGORY_PL, "이익", "영업이익", "TRY", actual_val))
+
+        return rows
+
     def _extract_plan(self, wb) -> List[AccountRow]:
         """사업계획 파일: Summary 시트에서 월별 데이터 추출"""
         ws = wb["Summary"]
@@ -125,7 +188,7 @@ class KctrParser(BaseParser):
             ym = f"{year}-{month_num:02d}"
             for row_num, (cat, sub, account) in KCTR_PLAN_MAP.items():
                 val = safe_float(ws.cell(row=row_num, column=col).value)
-                rows.append(self.make_row(ym, "KCTR", cat, sub, account, "KRW", val))
+                rows.append(self.make_row(ym, "KCTR", cat, sub, account, "KRW", val, data_type="계획"))
         return rows
 
     def _detect_year_plan(self, ws) -> str:

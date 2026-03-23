@@ -15,11 +15,12 @@ class BaseParser(ABC):
         rate = self.rates.get(currency, 1)
         return amount * rate
 
-    def make_row(self, ym, corp, cat, sub, account, currency, local_amount):
+    def make_row(self, ym, corp, cat, sub, account, currency, local_amount, data_type="실적"):
         rate = self.rates.get(currency, 1)
         return AccountRow(
             귀속연월=ym,
             법인코드=corp,
+            데이터타입=data_type,
             대분류=cat,
             중분류=sub,
             계정과목=account,

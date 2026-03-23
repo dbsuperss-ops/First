@@ -89,6 +89,33 @@ def smart_refine(df):
     
     return df
 
+# 파일명 패턴별 데이터 시작 마커 설정
+# (marker_text, include_marker_row)
+#   include_marker_row=True  → 마커 행 포함해서 읽기  (ksccz)
+#   include_marker_row=False → 마커 행 제외하고 다음 행부터 읽기 (ksci)
+FILE_MARKERS = {
+    'ksccz': ('2026年 业绩 _ 损益表 _EV', True),
+    'ksci':  ('▶ KSCM-GP (전장)',          False),
+}
+
+def apply_marker(df, file_stem):
+    """파일명에 해당하는 마커가 있으면 그 위치부터 df를 잘라 반환"""
+    stem_lower = file_stem.lower()
+    for key, (marker, include) in FILE_MARKERS.items():
+        if key in stem_lower:
+            # 모든 셀을 문자열로 변환해 마커 텍스트 검색
+            mask = df.apply(
+                lambda col: col.astype(str).str.contains(marker, regex=False, na=False)
+            ).any(axis=1)
+            matched = mask[mask].index
+            if len(matched) == 0:
+                print(f"    ⚠️ 마커를 찾지 못했습니다: '{marker}'")
+                return df
+            start = matched[0] if include else matched[0] + 1
+            print(f"    📌 마커 발견 ('{marker}') → {start}행부터 읽음")
+            return df.iloc[start:].reset_index(drop=True)
+    return df
+
 def process_file(file_path, output_dir):
     print(f"  [처리] {file_path.name}")
     try:
@@ -101,7 +128,10 @@ def process_file(file_path, output_dir):
             sheet_name = find_best_sheet(xl)
             # header=None으로 읽어서 직접 제어
             df = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
-        
+
+        # 법인별 마커 적용 (해당 없으면 그대로)
+        df = apply_marker(df, file_path.stem)
+
         refined_df = smart_refine(df)
         
         if refined_df.empty:

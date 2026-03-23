@@ -29,9 +29,9 @@ class KsceParser(BaseParser):
         wb = openpyxl.load_workbook(self.filepath, read_only=True, data_only=True)
         rows = []
 
-        # 시트 찾기 (KSCE 실적, Summary 등)
+        # 시트 찾기 (PL(KR), PL(Report), PL2026(KR), KSCE 실적, Summary, 손익계산서, PL 등)
         sheet_name = None
-        for name in ["KSCE 실적", "Summary", "손익계산서", "PL"]:
+        for name in ["PL(KR)", "PL(Report)", "PL2026(KR)", "KSCE 실적", "Summary", "손익계산서", "PL"]:
             if name in wb.sheetnames:
                 sheet_name = name
                 break

@@ -48,16 +48,26 @@ class KscpParser(BaseParser):
     def extract(self) -> List[AccountRow]:
         wb = openpyxl.load_workbook(self.filepath, read_only=True, data_only=True)
 
-        if "결산 종합" not in wb.sheetnames:
-            if "KSCP 계획" in wb.sheetnames:
+        # 결산 시트 찾기: 결산 종합, 월종합, 보고용자료 등
+        settlement_sheet = None
+        for candidate in ["결산 종합", "월종합", "보고용자료"]:
+            if candidate in wb.sheetnames:
+                settlement_sheet = candidate
+                break
+
+        if not settlement_sheet:
+            # 사업계획 시트 찾기
+            if "사업계획" in wb.sheetnames:
                 rows = self._extract_plan(wb)
+            elif "KSCP 계획" in wb.sheetnames:
+                rows = self._extract_plan_old(wb)
             else:
-                print(f"  [KSCP] 지원 시트 없음 (결산 종합, KSCP 계획 모두 없음) — 건너뜀")
+                print(f"  [KSCP] 지원 시트 없음 — 건너뜀")
                 rows = []
             wb.close()
             return rows
 
-        ws = wb["결산 종합"]
+        ws = wb[settlement_sheet]
         rows = []
 
         year = self._detect_year(wb)
@@ -80,7 +90,24 @@ class KscpParser(BaseParser):
         return rows
 
     def _extract_plan(self, wb) -> List[AccountRow]:
-        """KSCP 계획 시트 KRW 손익 요약 (rows 211~235) 에서 월별 데이터 추출"""
+        """사업계획 시트 KRW 손익 요약 (rows 211~235) 에서 월별 데이터 추출"""
+        ws = wb["사업계획"]
+        year = self._detect_year_plan(ws)
+        rows = []
+        for month_offset in range(12):
+            col = KSCP_PLAN_MONTH_COL_START + month_offset
+            month_num = month_offset + 1
+            test_val = ws.cell(row=211, column=col).value
+            if test_val is None or safe_float(test_val) == 0:
+                continue
+            ym = f"{year}-{month_num:02d}"
+            for row_num, (cat, sub, account) in KSCP_PLAN_MAP.items():
+                val = safe_float(ws.cell(row=row_num, column=col).value)
+                rows.append(self.make_row(ym, "KSCP", cat, sub, account, "KRW", val, data_type="계획"))
+        return rows
+
+    def _extract_plan_old(self, wb) -> List[AccountRow]:
+        """KSCP 계획 시트 (구 형식) 에서 월별 데이터 추출"""
         ws = wb["KSCP 계획"]
         year = self._detect_year_plan(ws)
         rows = []
@@ -93,7 +120,7 @@ class KscpParser(BaseParser):
             ym = f"{year}-{month_num:02d}"
             for row_num, (cat, sub, account) in KSCP_PLAN_MAP.items():
                 val = safe_float(ws.cell(row=row_num, column=col).value)
-                rows.append(self.make_row(ym, "KSCP", cat, sub, account, "KRW", val))
+                rows.append(self.make_row(ym, "KSCP", cat, sub, account, "KRW", val, data_type="계획"))
         return rows
 
     def _detect_year_plan(self, ws) -> str:

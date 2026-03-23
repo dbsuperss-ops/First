@@ -6,7 +6,15 @@
       "Read(//mnt/c/Users/**)",
       "Bash(claude doctor:*)",
       "Bash(npm i:*)",
-      "Bash(sudo npm:*)"
+      "Bash(sudo npm:*)",
+      "Bash(claude update:*)",
+      "Bash(npm --version)",
+      "Bash(curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh)",
+      "Bash(bash)",
+      "Bash(head -5 find /mnt/c/Users -name python*.exe)",
+      "Bash(cmd.exe /c \"C:\\\\Python314\\\\python.exe --version\")",
+      "Bash(powershell.exe -Command \"python --version\")",
+      "Bash(\"/mnt/c/Program Files/dotnet/dotnet.exe\" --version)"
     ],
     "deny": [],
     "ask": []

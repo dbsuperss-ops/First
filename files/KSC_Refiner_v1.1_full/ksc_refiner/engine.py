@@ -99,14 +99,15 @@ def write_consolidated(all_rows: list, output_path: str):
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
             cell.border = thin_border
             cell.font = Font(name="Arial", size=10)
-            if col_idx == 7:
+            # MASTER_COLUMNS: 귀속연월,법인코드,데이터타입,대분류,중분류,계정과목,현지통화,현지금액,적용환율,KRW금액
+            if col_idx == 8:
                 cell.number_format = num_fmt_local
-            elif col_idx == 8:
-                cell.number_format = num_fmt_rate
             elif col_idx == 9:
+                cell.number_format = num_fmt_rate
+            elif col_idx == 10:
                 cell.number_format = num_fmt_krw
 
-    col_widths = [12, 10, 6, 10, 16, 8, 18, 10, 18]
+    col_widths = [12, 10, 8, 6, 10, 16, 8, 18, 10, 18]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
@@ -125,7 +126,9 @@ def _create_summary(wb, all_rows):
     ws = wb.create_sheet("법인별_요약")
 
     companies = sorted(set(r.법인코드 for r in all_rows))
-    periods = sorted(set(r.귀속연월 for r in all_rows))
+    # 실적 기간만 요약 (계획 12개월이 섞이지 않도록)
+    actual_rows = [r for r in all_rows if r.데이터타입 == "실적"]
+    periods = sorted(set(r.귀속연월 for r in actual_rows)) or sorted(set(r.귀속연월 for r in all_rows))
 
     key_accounts = ["매출액", "매출원가", "매출총이익", "판관비계", "영업이익"]
 
@@ -149,7 +152,7 @@ def _create_summary(wb, all_rows):
             total = 0
             for comp_idx, comp in enumerate(companies, 3):
                 val = sum(
-                    r.KRW금액 for r in all_rows
+                    r.KRW금액 for r in actual_rows
                     if r.귀속연월 == period and r.법인코드 == comp and r.계정과목 == account
                 )
                 ws.cell(row=row_idx, column=comp_idx, value=val).number_format = '#,##0'
@@ -168,8 +171,13 @@ def _create_executive_report(wb, all_rows):
     ws = wb.create_sheet("경영보고서")
 
     companies = sorted(set(r.법인코드 for r in all_rows))
-    periods = sorted(set(r.귀속연월 for r in all_rows))
-    latest_period = periods[-1] if periods else "N/A"
+    # 실적 데이터의 최신 귀속연월을 당월로 사용 (계획 12개월에 끌려가지 않도록)
+    actual_rows = [r for r in all_rows if r.데이터타입 == "실적"]
+    plan_rows   = [r for r in all_rows if r.데이터타입 == "계획"]
+    actual_periods = sorted(set(r.귀속연월 for r in actual_rows))
+    latest_period = actual_periods[-1] if actual_periods else (
+        sorted(set(r.귀속연월 for r in all_rows))[-1] if all_rows else "N/A"
+    )
 
     hdr_font = Font(name="Arial", bold=True, color="FFFFFF", size=10)
     hdr_fill = PatternFill("solid", fgColor="2F5496")
@@ -187,8 +195,11 @@ def _create_executive_report(wb, all_rows):
         bottom=Side(style="thin", color="D9D9D9"),
     )
 
+    all_periods = sorted(set(r.귀속연월 for r in all_rows))
+    period_range_start = actual_periods[0] if actual_periods else (all_periods[0] if all_periods else "N/A")
+
     ws.cell(row=1, column=1, value=f"경신그룹 해외법인 경영실적 종합").font = Font(name="Arial", bold=True, size=14)
-    ws.cell(row=2, column=1, value=f"최신 귀속월: {latest_period} | 누적 기간: {periods[0]} ~ {latest_period} | 단위: 백만원(KRW)").font = Font(name="Arial", size=10, color="808080")
+    ws.cell(row=2, column=1, value=f"당월(실적): {latest_period} | 누적: {period_range_start} ~ {latest_period} | 단위: 백만원(KRW)").font = Font(name="Arial", size=10, color="808080")
 
     row = 4
     pl_accounts = [
@@ -204,7 +215,16 @@ def _create_executive_report(wb, all_rows):
         ("경비", ["제조경비계", "기계경비"]),
     ]
 
-    headers = ["구분", "계정과목"] + [f"{c}\n(당월)" for c in companies] + [f"{c}\n(누계)" for c in companies] + ["합계\n(누계)"]
+    # 헤더: 구분 | 계정과목 | [법인별 실적당월] | [법인별 계획당월] | [법인별 실적누계] | [법인별 계획누계] | 합계(실적누계)
+    n = len(companies)
+    headers = (
+        ["구분", "계정과목"]
+        + [f"{c}\n실적당월" for c in companies]
+        + [f"{c}\n계획당월" for c in companies]
+        + [f"{c}\n실적누계" for c in companies]
+        + [f"{c}\n계획누계" for c in companies]
+        + ["합계\n(실적누계)"]
+    )
     for ci, h in enumerate(headers, 1):
         cell = ws.cell(row=row, column=ci, value=h)
         cell.font = hdr_font
@@ -214,10 +234,21 @@ def _create_executive_report(wb, all_rows):
 
     row += 1
 
-    def get_val(corp, acct, period=None):
+    def get_val(corp, acct, period=None, dtype=None):
+        filtered = all_rows
+        if dtype:
+            filtered = [r for r in filtered if r.데이터타입 == dtype]
         if period:
-            return sum(r.KRW금액 for r in all_rows if r.법인코드 == corp and r.계정과목 == acct and r.귀속연월 == period)
-        return sum(r.KRW금액 for r in all_rows if r.법인코드 == corp and r.계정과목 == acct)
+            filtered = [r for r in filtered if r.귀속연월 == period]
+        return sum(r.KRW금액 for r in filtered if r.법인코드 == corp and r.계정과목 == acct)
+
+    def get_val_ytd(corp, acct, up_to_period, dtype=None):
+        """up_to_period 이하의 누계값 반환"""
+        filtered = all_rows
+        if dtype:
+            filtered = [r for r in filtered if r.데이터타입 == dtype]
+        return sum(r.KRW금액 for r in filtered
+                   if r.법인코드 == corp and r.계정과목 == acct and r.귀속연월 <= up_to_period)
 
     def write_account_row(ws, row, section, acct, companies, latest, is_key=False):
         ws.cell(row=row, column=1, value=section).border = thin_b
@@ -226,42 +257,50 @@ def _create_executive_report(wb, all_rows):
         if is_key:
             cell_acct.font = sub_hdr_font
 
-        total_cum = 0
+        total_actual_cum = 0
         for ci, comp in enumerate(companies):
-            monthly = get_val(comp, acct, latest) / 1_000_000
-            cum = get_val(comp, acct) / 1_000_000
+            act_m  = get_val(corp=comp, acct=acct, period=latest, dtype="실적") / 1_000_000
+            plan_m = get_val(corp=comp, acct=acct, period=latest, dtype="계획") / 1_000_000
+            act_c  = get_val_ytd(comp, acct, latest, dtype="실적") / 1_000_000
+            plan_c = get_val_ytd(comp, acct, latest, dtype="계획") / 1_000_000
 
-            m_cell = ws.cell(row=row, column=3 + ci, value=round(monthly, 0))
-            m_cell.number_format = num_fmt
-            m_cell.border = thin_b
-            m_cell.font = loss_font if monthly < 0 else normal_font
+            def write_cell(col, val):
+                c = ws.cell(row=row, column=col, value=round(val, 0))
+                c.number_format = num_fmt
+                c.border = thin_b
+                c.font = loss_font if val < 0 else normal_font
 
-            c_cell = ws.cell(row=row, column=3 + len(companies) + ci, value=round(cum, 0))
-            c_cell.number_format = num_fmt
-            c_cell.border = thin_b
-            c_cell.font = loss_font if cum < 0 else normal_font
+            write_cell(3 + ci,         act_m)   # 실적 당월
+            write_cell(3 + n + ci,     plan_m)  # 계획 당월
+            write_cell(3 + 2*n + ci,   act_c)   # 실적 누계
+            write_cell(3 + 3*n + ci,   plan_c)  # 계획 누계
 
-            total_cum += cum
+            total_actual_cum += act_c
 
-        t_cell = ws.cell(row=row, column=3 + 2 * len(companies), value=round(total_cum, 0))
+        t_cell = ws.cell(row=row, column=3 + 4 * n, value=round(total_actual_cum, 0))
         t_cell.number_format = num_fmt
         t_cell.border = thin_b
-        t_cell.font = Font(name="Arial", bold=True, size=10, color="FF0000" if total_cum < 0 else "000000")
+        t_cell.font = Font(name="Arial", bold=True, size=10, color="FF0000" if total_actual_cum < 0 else "000000")
 
         if acct in ("매출총이익", "영업이익"):
-            for c in range(1, 3 + 2 * len(companies) + 1):
+            for c in range(1, 3 + 4 * n + 1):
                 ws.cell(row=row, column=c).fill = profit_fill
+
+    total_cols = 3 + 4 * n  # 구분+계정+실적당월n+계획당월n+실적누계n+계획누계n+합계
 
     ws.cell(row=row, column=1, value="【 PL 】").font = sub_hdr_font
     ws.cell(row=row, column=1).fill = sub_hdr_fill
-    for ci in range(2, 3 + 2 * len(companies) + 1):
+    for ci in range(2, total_cols + 1):
         ws.cell(row=row, column=ci).fill = sub_hdr_fill
         ws.cell(row=row, column=ci).border = thin_b
     row += 1
 
     for section, accts in pl_accounts:
         for acct in accts:
-            has_data = any(get_val(c, acct) != 0 for c in companies)
+            has_data = any(
+                get_val(corp=c, acct=acct, dtype="실적") != 0 or get_val(corp=c, acct=acct, dtype="계획") != 0
+                for c in companies
+            )
             if has_data:
                 is_key = acct in ("매출액", "매출원가", "매출총이익", "판관비계", "영업이익")
                 write_account_row(ws, row, section, acct, companies, latest_period, is_key)
@@ -270,14 +309,17 @@ def _create_executive_report(wb, all_rows):
     row += 1
     ws.cell(row=row, column=1, value="【 제조원가 】").font = sub_hdr_font
     ws.cell(row=row, column=1).fill = sub_hdr_fill
-    for ci in range(2, 3 + 2 * len(companies) + 1):
+    for ci in range(2, total_cols + 1):
         ws.cell(row=row, column=ci).fill = sub_hdr_fill
         ws.cell(row=row, column=ci).border = thin_b
     row += 1
 
     for section, accts in mc_accounts:
         for acct in accts:
-            has_data = any(get_val(c, acct) != 0 for c in companies)
+            has_data = any(
+                get_val(corp=c, acct=acct, dtype="실적") != 0 or get_val(corp=c, acct=acct, dtype="계획") != 0
+                for c in companies
+            )
             if has_data:
                 write_account_row(ws, row, section, acct, companies, latest_period)
                 row += 1
@@ -285,7 +327,7 @@ def _create_executive_report(wb, all_rows):
     row += 1
     ws.cell(row=row, column=1, value="【 이익률 (%) 】").font = sub_hdr_font
     ws.cell(row=row, column=1).fill = sub_hdr_fill
-    for ci in range(2, 3 + 2 * len(companies) + 1):
+    for ci in range(2, total_cols + 1):
         ws.cell(row=row, column=ci).fill = sub_hdr_fill
     row += 1
 
@@ -296,21 +338,32 @@ def _create_executive_report(wb, all_rows):
 
         acct = "매출총이익" if "총" in label else "영업이익"
         for ci, comp in enumerate(companies):
-            rev_m = get_val(comp, "매출액", latest_period)
-            profit_m = get_val(comp, acct, latest_period)
-            rev_c = get_val(comp, "매출액")
-            profit_c = get_val(comp, acct)
+            # 실적 당월 이익률
+            rev_m_a  = get_val(corp=comp, acct="매출액", period=latest_period, dtype="실적")
+            prof_m_a = get_val(corp=comp, acct=acct,     period=latest_period, dtype="실적")
+            # 계획 당월 이익률
+            rev_m_p  = get_val(corp=comp, acct="매출액", period=latest_period, dtype="계획")
+            prof_m_p = get_val(corp=comp, acct=acct,     period=latest_period, dtype="계획")
+            # 실적 누계 이익률
+            rev_c_a  = get_val_ytd(comp, "매출액", latest_period, dtype="실적")
+            prof_c_a = get_val_ytd(comp, acct,     latest_period, dtype="실적")
+            # 계획 누계 이익률
+            rev_c_p  = get_val_ytd(comp, "매출액", latest_period, dtype="계획")
+            prof_c_p = get_val_ytd(comp, acct,     latest_period, dtype="계획")
 
-            m_cell = ws.cell(row=row, column=3 + ci, value=profit_m / rev_m if rev_m else 0)
-            m_cell.number_format = pct_fmt
-            m_cell.border = thin_b
-            c_cell = ws.cell(row=row, column=3 + len(companies) + ci, value=profit_c / rev_c if rev_c else 0)
-            c_cell.number_format = pct_fmt
-            c_cell.border = thin_b
+            def pct_cell(col, num, den):
+                c = ws.cell(row=row, column=col, value=num / den if den else 0)
+                c.number_format = pct_fmt
+                c.border = thin_b
+
+            pct_cell(3 + ci,       prof_m_a, rev_m_a)
+            pct_cell(3 + n + ci,   prof_m_p, rev_m_p)
+            pct_cell(3 + 2*n + ci, prof_c_a, rev_c_a)
+            pct_cell(3 + 3*n + ci, prof_c_p, rev_c_p)
 
         row += 1
 
-    col_widths = [10, 16] + [14] * (2 * len(companies) + 1)
+    col_widths = [10, 16] + [13] * (4 * n + 1)
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[ws.cell(row=4, column=i).column_letter].width = w
 
@@ -319,7 +372,15 @@ def _create_executive_report(wb, all_rows):
 
 def load_settings(config_dir: str = None) -> dict:
     if config_dir is None:
-        config_dir = os.path.join(os.path.dirname(__file__), "config")
+        # PyInstaller 실행 시 번들 리소스 경로 사용
+        if getattr(sys, 'frozen', False):
+            # PyInstaller로 패키징된 경우
+            base_path = sys._MEIPASS
+        else:
+            # 일반 Python 실행 시
+            base_path = os.path.dirname(__file__)
+        config_dir = os.path.join(base_path, "config")
+
     path = os.path.join(config_dir, "settings.json")
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
@@ -328,21 +389,43 @@ def load_settings(config_dir: str = None) -> dict:
 
 def save_settings(settings: dict, config_dir: str = None):
     if config_dir is None:
+        # PyInstaller로 패키징된 경우 쓰기 불가능한 번들 경로이므로 스킵
+        if getattr(sys, 'frozen', False):
+            # 번들된 실행 파일에서는 설정 저장 스킵
+            return
         config_dir = os.path.join(os.path.dirname(__file__), "config")
-    os.makedirs(config_dir, exist_ok=True)
-    path = os.path.join(config_dir, "settings.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        path = os.path.join(config_dir, "settings.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(settings, f, ensure_ascii=False, indent=2)
+    except (OSError, PermissionError):
+        # 쓰기 권한이 없는 경우 조용히 무시
+        pass
 
 def main(input_dir: str = None, output_dir: str = None, year: str = "2026"):
-    config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+    # PyInstaller 실행 시 번들 리소스 경로 사용
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    config_dir = os.path.join(base_path, "config")
     settings = load_settings(config_dir)
 
     if input_dir is None:
         input_dir = settings.get("root_path", os.path.join(os.path.dirname(__file__), "..", "input"))
     if output_dir is None:
-        output_dir = settings.get("output_path", os.path.join(os.path.dirname(__file__), "output"))
+        saved_output = settings.get("output_path")
+        # Windows 경로가 저장되어 있으면 무시하고 기본값 사용
+        if saved_output and (saved_output.startswith("C:\\") or ":" in saved_output[:3]):
+            output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+        else:
+            output_dir = saved_output or os.environ.get('KSC_OUTPUT_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"))
 
+    # 경로 정규화
+    output_dir = os.path.abspath(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     settings["root_path"] = input_dir

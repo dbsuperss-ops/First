@@ -111,14 +111,14 @@ class KsciParser(BaseParser):
                 continue
             for row_num, (cat, sub, account) in KSCI_PLAN_IS_MAP.items():
                 val = monthly.get((month_offset, row_num), 0.0)
-                rows.append(self.make_row(ym, "KSCI", cat, sub, account, "USD", val))
+                rows.append(self.make_row(ym, "KSCI", cat, sub, account, "USD", val, data_type="계획"))
             # 영업이익 = 매출 - 재료비 - 노무비 - 경비 - 판관비
             op = (monthly.get((month_offset, 5), 0.0)
                   - monthly.get((month_offset, 9), 0.0)
                   - monthly.get((month_offset, 21), 0.0)
                   - monthly.get((month_offset, 35), 0.0)
                   - monthly.get((month_offset, 71), 0.0))
-            rows.append(self.make_row(ym, "KSCI", CATEGORY_PL, "이익", "영업이익", "USD", op))
+            rows.append(self.make_row(ym, "KSCI", CATEGORY_PL, "이익", "영업이익", "USD", op, data_type="계획"))
         return rows
 
     def _extract_mc_summary(self, wb, year) -> List[AccountRow]:
