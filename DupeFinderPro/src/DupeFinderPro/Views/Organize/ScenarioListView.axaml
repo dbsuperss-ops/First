@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DupeFinderPro.ViewModels.Organize"
+             x:Class="DupeFinderPro.Views.Organize.ScenarioListView"
+             x:DataType="vm:ScenarioListViewModel">
+
+    <Grid>
+        <!-- List view -->
+        <ScrollViewer Padding="32 28" IsVisible="{Binding !IsEditing}">
+            <StackPanel Spacing="24">
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="4">
+                        <TextBlock Classes="page-title" Text="시나리오 관리"/>
+                        <TextBlock Classes="muted" Text="파일 분류 규칙 시나리오를 만들고 관리합니다."/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="primary" VerticalAlignment="Center"
+                            Content="+ 새 시나리오"
+                            Command="{Binding NewScenarioCommand}"/>
+                </Grid>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="0">
+                        <ItemsControl ItemsSource="{Binding Scenarios}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ScenarioItemViewModel">
+                                    <Border Padding="16" BorderThickness="0 0 0 1"
+                                            BorderBrush="{StaticResource BorderBrush}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="4">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Classes="label" Text="{Binding ScenarioName}"/>
+                                                    <Border CornerRadius="10" Padding="6 2"
+                                                            Background="#1A10B981"
+                                                            IsVisible="{Binding IsActive}">
+                                                        <TextBlock Text="활성" FontSize="11"
+                                                                   Foreground="{StaticResource StatusGreenBrush}"/>
+                                                    </Border>
+                                                    <Border CornerRadius="10" Padding="6 2"
+                                                            Background="#1A3B82F6"
+                                                            IsVisible="{Binding IsWatching}">
+                                                        <TextBlock Text="감시 중" FontSize="11"
+                                                                   Foreground="{StaticResource AccentTealBrush}"/>
+                                                    </Border>
+                                                    <Border CornerRadius="10" Padding="6 2"
+                                                            Background="#1AF59E0B"
+                                                            IsVisible="{Binding IsScheduled}">
+                                                        <TextBlock Text="예약됨" FontSize="11"
+                                                                   Foreground="{StaticResource StatusOrangeBrush}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Classes="muted"
+                                                           Text="{Binding SourceFolder}"/>
+                                                <TextBlock Classes="muted" FontSize="11"
+                                                           Text="{Binding RuleCount, StringFormat='규칙 {0}개'}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                                        VerticalAlignment="Center">
+                                                <Button Classes="secondary" Content="감시"
+                                                        Command="{Binding $parent[ItemsControl].DataContext.ToggleWatchCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Classes="secondary" Content="편집"
+                                                        Command="{Binding $parent[ItemsControl].DataContext.EditScenarioCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                                <Button Classes="danger" Content="삭제"
+                                                        Command="{Binding $parent[ItemsControl].DataContext.DeleteScenarioCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="muted" Padding="16"
+                                   Text="시나리오가 없습니다. 새 시나리오를 만들어 보세요."
+                                   IsVisible="{Binding !Scenarios.Count}"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Edit view (inline) -->
+        <ContentControl IsVisible="{Binding IsEditing}"
+                        Content="{Binding EditViewModel}"/>
+    </Grid>
+</UserControl>

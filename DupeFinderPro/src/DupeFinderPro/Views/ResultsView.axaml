@@ -19,14 +19,28 @@
                 <Button Classes="danger" Content="취소"
                         Command="{Binding CancelScanCommand}"
                         IsVisible="{Binding IsScanning}"/>
-                <!-- 스캔 완료 후 일괄 적용 -->
+                <!-- 결과 일괄 설정 -->
+                <Button Classes="secondary" Content="자동 선택"
+                        Command="{Binding AutoSelectAllCommand}"
+                        IsVisible="{Binding HasResults}"
+                        ToolTip.Tip="각 그룹에서 첫 번째 파일은 유지, 나머지는 삭제로 설정"/>
+                <Button Classes="secondary" Content="전체 삭제 설정"
+                        Command="{Binding SetAllDeleteCommand}"
+                        IsVisible="{Binding HasResults}"
+                        ToolTip.Tip="Keep 파일을 제외한 모든 파일을 삭제로 설정"/>
+                <Button Classes="secondary" Content="전체 격리 설정"
+                        Command="{Binding SetAllQuarantineCommand}"
+                        IsVisible="{Binding HasResults}"
+                        ToolTip.Tip="Keep 파일을 제외한 모든 파일을 격리로 설정"/>
+                <Button Classes="secondary" Content="전체 이동 설정"
+                        Command="{Binding SetAllMoveCommand}"
+                        IsVisible="{Binding HasResults}"
+                        ToolTip.Tip="Keep 파일을 제외한 모든 파일을 이동으로 설정"/>
+                <!-- 최종 적용 -->
                 <Button Classes="primary" Content="전체 적용"
                         Command="{Binding ApplyAllCommand}"
                         IsVisible="{Binding HasResults}"
                         IsEnabled="{Binding !IsApplying}"/>
-                <Button Classes="secondary" Content="자동 선택"
-                        Command="{Binding AutoSelectAllCommand}"
-                        IsVisible="{Binding HasResults}"/>
             </StackPanel>
         </Grid>
 
@@ -90,8 +104,16 @@
                 <!-- 격리 폴더 경로 -->
                 <StackPanel Spacing="2" Margin="16 0 0 0">
                     <TextBlock Classes="label" Text="격리 폴더"/>
-                    <TextBox Classes="input" MinWidth="260"
+                    <TextBox Classes="input" MinWidth="220"
                              Text="{Binding QuarantinePath}"/>
+                </StackPanel>
+
+                <!-- 이동 대상 폴더 경로 -->
+                <StackPanel Spacing="2" Margin="8 0 0 0">
+                    <TextBlock Classes="label" Text="이동 대상 폴더"/>
+                    <TextBox Classes="input" MinWidth="220"
+                             Text="{Binding MoveToPath}"
+                             Watermark="이동할 폴더 경로 입력"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -146,7 +168,7 @@
                                                 Command="{Binding AutoSelectCommand}"
                                                 Padding="10 4" Margin="0 0 8 0"/>
                                         <TextBlock Grid.Column="4"
-                                                   Text="{Binding IsExpanded, StringFormat='{}▼ {0:▲}'}"
+                                                   Text="{Binding ExpandIcon}"
                                                    VerticalAlignment="Center"
                                                    Foreground="{StaticResource TextSecondaryBrush}"/>
                                     </Grid>

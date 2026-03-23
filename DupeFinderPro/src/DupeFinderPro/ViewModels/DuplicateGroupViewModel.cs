@@ -11,8 +11,9 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
     [ObservableProperty] private bool _isExpanded = true;
 
     public string Hash          => Group.Hash[..Math.Min(8, Group.Hash.Length)] + "…";
-    public string FileCount     => $"{Group.Files.Count} files";
+    public string FileCount     => $"{Group.Files.Count}개 파일";
     public string WastedBytes   => FormatBytes(Group.WastedBytes);
+    public string ExpandIcon    => IsExpanded ? "▲" : "▼";
     public string TotalSize     => FormatBytes(Group.SizeBytes * Group.Files.Count);
     public DuplicateGroup Group { get; }
 
@@ -33,6 +34,8 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
                 return vm;
             }));
     }
+
+    partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(ExpandIcon));
 
     [RelayCommand]
     private void ToggleExpanded() => IsExpanded = !IsExpanded;

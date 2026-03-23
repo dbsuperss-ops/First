@@ -10,81 +10,149 @@
             <!-- ── 헤더 ──────────────────────────────────────── -->
             <StackPanel Spacing="4">
                 <TextBlock Classes="page-title" Text="대시보드"/>
-                <TextBlock Classes="muted" Text="중복 파일 스캔 현황 요약"/>
+                <TextBlock Classes="muted" Text="파일 분류 및 중복 관리 현황"/>
             </StackPanel>
 
-            <!-- ── 통계 카드 ──────────────────────────────────── -->
-            <Grid ColumnDefinitions="*,*,*,*" Height="110">
-                <Grid.Styles>
-                    <Style Selector="Border.stat-card">
-                        <Setter Property="Background"   Value="{StaticResource CardBgBrush}"/>
-                        <Setter Property="CornerRadius" Value="12"/>
-                        <Setter Property="Padding"      Value="20"/>
-                        <Setter Property="BoxShadow"    Value="0 2 8 0 #16000000"/>
-                    </Style>
-                </Grid.Styles>
+            <!-- ── 파일 분류 통계 (주요) ──────────────────────── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="파일 분류 현황"/>
+                    <Grid ColumnDefinitions="*,*,*,*" Height="90">
 
-                <!-- 중복 그룹 -->
-                <Border Grid.Column="0" Classes="stat-card" Margin="0 0 8 0">
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="muted" Text="중복 그룹"/>
-                        <TextBlock Text="{Binding TotalDuplicatesFound}"
-                                   FontSize="32" FontWeight="Bold"
-                                   Foreground="{StaticResource AccentTealBrush}"/>
-                        <TextBlock Classes="muted" Text="전체 스캔 합계"/>
-                    </StackPanel>
-                </Border>
+                        <Border Grid.Column="0" Classes="stat-card" Margin="0 0 8 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="활성 시나리오"/>
+                                <TextBlock Text="{Binding ActiveScenarioCount}"
+                                           FontSize="30" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentTealBrush}"/>
+                                <TextBlock Classes="muted"
+                                           Text="{Binding TotalScenariosCount, StringFormat='전체 {0}개'}"/>
+                            </StackPanel>
+                        </Border>
 
-                <!-- 낭비 공간 -->
-                <Border Grid.Column="1" Classes="stat-card" Margin="4 0">
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="muted" Text="낭비 공간"/>
-                        <TextBlock Text="{Binding TotalWastedFormatted}"
-                                   FontSize="32" FontWeight="Bold"
-                                   Foreground="{StaticResource StatusOrangeBrush}"/>
-                        <TextBlock Classes="muted" Text="회수 가능"/>
-                    </StackPanel>
-                </Border>
+                        <Border Grid.Column="1" Classes="stat-card" Margin="4 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="정리된 파일"/>
+                                <TextBlock Text="{Binding TotalFilesOrganized}"
+                                           FontSize="30" FontWeight="Bold"
+                                           Foreground="{StaticResource StatusGreenBrush}"/>
+                                <TextBlock Classes="muted" Text="개 파일 이동"/>
+                            </StackPanel>
+                        </Border>
 
-                <!-- 총 스캔 수 -->
-                <Border Grid.Column="2" Classes="stat-card" Margin="4 0">
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="muted" Text="총 스캔 수"/>
-                        <TextBlock Text="{Binding TotalScansRun}"
-                                   FontSize="32" FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <TextBlock Classes="muted" Text="회 스캔 완료"/>
-                    </StackPanel>
-                </Border>
+                        <Border Grid.Column="2" Classes="stat-card" Margin="4 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="정리된 용량"/>
+                                <TextBlock Text="{Binding TotalBytesOrganizedText}"
+                                           FontSize="22" FontWeight="Bold"
+                                           Foreground="{StaticResource StatusBlueBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
 
-                <!-- 마지막 스캔 -->
-                <Border Grid.Column="3" Classes="stat-card" Margin="8 0 0 0">
-                    <StackPanel Spacing="6">
-                        <TextBlock Classes="muted" Text="마지막 스캔"/>
-                        <TextBlock Text="{Binding LastScanTime}"
-                                   FontSize="18" FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimaryBrush}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                        <Border Grid.Column="3" Classes="stat-card" Margin="8 0 0 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="마지막 정리"/>
+                                <TextBlock Text="{Binding LastOrganizeTime}"
+                                           FontSize="14" FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                    </Grid>
+                </StackPanel>
+            </Border>
 
             <!-- ── 빠른 작업 ──────────────────────────────── -->
             <Border Classes="card">
                 <StackPanel Spacing="16">
                     <TextBlock Classes="section-title" Text="빠른 작업"/>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="10" FlowDirection="LeftToRight">
                         <Button Classes="primary"
+                                Content="시나리오 관리"
+                                Command="{Binding GoToScenariosCommand}"/>
+                        <Button Classes="secondary"
+                                Content="파일 정리 실행"
+                                Command="{Binding GoToOrganizeCommand}"/>
+                        <Button Classes="secondary"
                                 Content="새 스캔 시작"
                                 Command="{Binding StartNewScanCommand}"/>
                         <Button Classes="secondary"
-                                Content="스캔 기록 보기"
+                                Content="스캔 기록"
                                 Command="{Binding ViewHistoryCommand}"/>
                         <Button Classes="secondary"
-                                Content="결과 보기"
+                                Content="중복 결과 보기"
                                 IsEnabled="{Binding HasRecentScan}"
                                 Command="{Binding ViewResultsCommand}"/>
                     </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 중복 파일 스캔 현황 ────────────────────────── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="중복 파일 스캔 현황"/>
+                    <Grid ColumnDefinitions="*,*,*" Height="80">
+
+                        <Border Grid.Column="0" Classes="stat-card" Margin="0 0 8 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="중복 그룹"/>
+                                <TextBlock Text="{Binding TotalDuplicatesFound}"
+                                           FontSize="26" FontWeight="Bold"
+                                           Foreground="{StaticResource StatusOrangeBrush}"/>
+                                <TextBlock Classes="muted" Text="전체 스캔 합계"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Classes="stat-card" Margin="4 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="회수 가능 공간"/>
+                                <TextBlock Text="{Binding TotalWastedFormatted}"
+                                           FontSize="20" FontWeight="Bold"
+                                           Foreground="{StaticResource StatusOrangeBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Classes="stat-card" Margin="8 0 0 0">
+                            <StackPanel Spacing="4">
+                                <TextBlock Classes="muted" Text="총 스캔 수"/>
+                                <TextBlock Text="{Binding TotalScansRun}"
+                                           FontSize="26" FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                                <TextBlock Classes="muted"
+                                           Text="{Binding LastScanTime, StringFormat='마지막: {0}'}"/>
+                            </StackPanel>
+                        </Border>
+
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 빈 폴더 삭제 ────────────────────────── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="빈 폴더 삭제"/>
+                    <TextBlock Classes="muted" Text="선택한 폴더 내 모든 빈 폴더를 재귀적으로 삭제합니다."/>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0" Classes="input"
+                                 Text="{Binding EmptyFolderRoot}"
+                                 Watermark="예: C:\Users\사용자\문서"/>
+                        <Button Grid.Column="1" Classes="secondary"
+                                Content="📁"
+                                ToolTip.Tip="폴더 선택"
+                                Click="BrowseEmptyFolderRoot_Click"/>
+                        <Button Grid.Column="2" Classes="danger"
+                                Content="빈 폴더 삭제"
+                                Command="{Binding DeleteEmptyFoldersCommand}"
+                                IsEnabled="{Binding !IsDeletingEmptyFolders}"/>
+                    </Grid>
+                    <Border Background="#FFF5F5" CornerRadius="6" Padding="10 8"
+                            IsVisible="{Binding HasEmptyFolderResult}">
+                        <TextBlock Foreground="{StaticResource StatusRedBrush}"
+                                   Text="{Binding EmptyFolderResult}"/>
+                    </Border>
                 </StackPanel>
             </Border>
 
@@ -126,14 +194,11 @@
                                                    Margin="12 0"/>
                                         <Border Grid.Column="2" VerticalAlignment="Center"
                                                 CornerRadius="12" Padding="8 3"
-                                                HorizontalAlignment="Right">
-                                            <Border.Background>
-                                                <MultiBinding>
-                                                    <Binding Path="IsCompleted"/>
-                                                </MultiBinding>
-                                            </Border.Background>
+                                                HorizontalAlignment="Right"
+                                                Background="#1A10B981">
                                             <TextBlock Text="{Binding Status}"
-                                                       FontSize="12" FontWeight="SemiBold"/>
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource StatusGreenBrush}"/>
                                         </Border>
                                     </Grid>
                                 </Border>
