@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:DupeFinderPro.ViewModels"
-             x:Class="DupeFinderPro.Views.ScanHistoryView"
+             xmlns:vm="using:DupeFinderPro.ViewModels.Duplicate"
+             x:Class="DupeFinderPro.Views.Duplicate.ScanHistoryView"
              x:DataType="vm:ScanHistoryViewModel">
 
     <DockPanel Margin="32 28">

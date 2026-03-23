@@ -1,0 +1,485 @@
+<Window x:Class="AIRoundTable.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AIRoundTable"
+        Title="AI 원탁회의"
+        Height="900" Width="1200"
+        MinHeight="600" MinWidth="820"
+        WindowStartupLocation="CenterScreen"
+        Background="#F9FAFB"
+        FontFamily="맑은 고딕">
+
+    <Window.Resources>
+        <!-- ── 브러시 ───────────────────────────────────────────────────── -->
+        <SolidColorBrush x:Key="PrimaryBrush"      Color="#7C3AED"/>
+        <SolidColorBrush x:Key="PrimaryLightBrush" Color="#EDE9FE"/>
+        <SolidColorBrush x:Key="ActiveSessionBg"   Color="#F5F3FF"/>
+        <SolidColorBrush x:Key="BorderBrush"       Color="#E5E7EB"/>
+        <SolidColorBrush x:Key="TextPrimary"       Color="#111827"/>
+        <SolidColorBrush x:Key="TextSecondary"     Color="#6B7280"/>
+        <SolidColorBrush x:Key="TextMuted"         Color="#9CA3AF"/>
+        <SolidColorBrush x:Key="SurfaceBrush"      Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="BgBrush"           Color="#F9FAFB"/>
+
+        <!-- ── 상단 바 아웃라인 버튼 스타일 ────────────────────────────── -->
+        <Style x:Key="OutlineButtonStyle" TargetType="Button">
+            <Setter Property="Background"   Value="Transparent"/>
+            <Setter Property="Foreground"   Value="{StaticResource TextSecondary}"/>
+            <Setter Property="BorderBrush"  Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"      Value="12,6"/>
+            <Setter Property="FontSize"     Value="13"/>
+            <Setter Property="Cursor"       Value="Hand"/>
+            <Setter Property="FontFamily"   Value="맑은 고딕"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F3F4F6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── 새 원탁회의 버튼 스타일 ─────────────────────────────────── -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize"        Value="13"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="FontFamily"      Value="맑은 고딕"/>
+            <Setter Property="Padding"         Value="0,11"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="10"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#6D28D9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#5B21B6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── 전송 버튼 스타일 ─────────────────────────────────────────── -->
+        <Style x:Key="SendButtonStyle" TargetType="Button">
+            <Setter Property="Background"      Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width"           Value="46"/>
+            <Setter Property="Height"          Value="46"/>
+            <Setter Property="FontSize"        Value="20"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="12"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#6D28D9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#5B21B6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── 세션 목록 아이템 스타일 ──────────────────────────────────── -->
+        <Style x:Key="SessionItemStyle" TargetType="ListBoxItem">
+            <Setter Property="Padding"                   Value="0"/>
+            <Setter Property="Margin"                    Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor"                    Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" Background="Transparent" Padding="0">
+                            <Grid>
+                                <!-- 선택 시 좌측 보라색 액센트 바 -->
+                                <Border x:Name="AccentBar"
+                                        Width="3"
+                                        HorizontalAlignment="Left"
+                                        Background="{StaticResource PrimaryBrush}"
+                                        Visibility="Collapsed"/>
+                                <ContentPresenter Margin="16,10,12,10"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd"        Property="Background" Value="{StaticResource ActiveSessionBg}"/>
+                                <Setter TargetName="AccentBar" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected"  Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgBrush}"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── 세션 목록 스크롤바 숨김 ──────────────────────────────────── -->
+        <Style x:Key="SessionListBoxStyle" TargetType="ListBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background"      Value="Transparent"/>
+            <Setter Property="Padding"         Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility"   Value="Auto"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="60"/>  <!-- 상단 글로벌 바 -->
+            <RowDefinition Height="*"/>   <!-- 본문 -->
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- 상단 바                                                        -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid Margin="20,0">
+                <!-- 앱 로고 + 타이틀 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="34" Height="34" CornerRadius="9"
+                            Background="{StaticResource PrimaryLightBrush}">
+                        <TextBlock Text="🤝" FontSize="18"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="AI 원탁회의"
+                               FontSize="16" FontWeight="Bold"
+                               Foreground="{StaticResource TextPrimary}"
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0"/>
+                </StackPanel>
+
+                <!-- 우측 액션 버튼 -->
+                <StackPanel HorizontalAlignment="Right"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Content="□  대화"
+                            Style="{StaticResource OutlineButtonStyle}"
+                            Margin="0,0,8,0"/>
+                    <Button Content="👤  참가자"
+                            Style="{StaticResource OutlineButtonStyle}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- 본문 (사이드바 + 메인)                                          -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="270"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ── 사이드바 ────────────────────────────────────────────── -->
+            <Border Grid.Column="0"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <!-- 새 원탁회의 버튼 -->
+                    <Border DockPanel.Dock="Top" Padding="12,10">
+                        <Button Content="＋  새 원탁회의"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Click="NewSession_Click"/>
+                    </Border>
+
+                    <!-- 세션 목록 -->
+                    <ListBox x:Name="_sessionListBox"
+                             Style="{StaticResource SessionListBoxStyle}"
+                             ItemContainerStyle="{StaticResource SessionItemStyle}"
+                             SelectionChanged="SessionListBox_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="18"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 채팅 아이콘 -->
+                                    <Border Grid.Column="0"
+                                            Width="30" Height="30"
+                                            CornerRadius="7"
+                                            Background="#F3F4F6"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="💬" FontSize="14"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+
+                                    <!-- 이름 + 날짜 -->
+                                    <StackPanel Grid.Column="1"
+                                                Margin="8,0,0,0"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="13"
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding CreatedAtText}"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource TextMuted}"
+                                                   Margin="0,3,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- 화살표 -->
+                                    <TextBlock Grid.Column="2"
+                                               Text="›"
+                                               FontSize="20"
+                                               Foreground="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Right"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- ── 메인 콘텐츠 영역 ─────────────────────────────────────── -->
+            <Grid Grid.Column="1" Background="{StaticResource BgBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>  <!-- 세션 헤더 -->
+                    <RowDefinition Height="*"/>     <!-- 메시지 목록 -->
+                    <RowDefinition Height="Auto"/>  <!-- 입력 영역 -->
+                </Grid.RowDefinitions>
+
+                <!-- 세션 헤더 -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="22,14">
+                    <StackPanel>
+                        <TextBlock x:Name="_sessionTitle"
+                                   Text="세션을 선택하시오"
+                                   FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimary}"/>
+                        <TextBlock x:Name="_sessionDesc"
+                                   Text=""
+                                   FontSize="13"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 메시지 목록 -->
+                <ScrollViewer x:Name="_messageScrollViewer"
+                              Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              PanningMode="VerticalOnly">
+                    <ItemsControl x:Name="_messageList" Padding="0,10,0,20">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type local:MessageViewModel}">
+                                <Grid Margin="22,10,22,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="46"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 아바타 원 -->
+                                    <Border Grid.Column="0"
+                                            Width="38" Height="38"
+                                            CornerRadius="19"
+                                            Background="{Binding AvatarBrush}"
+                                            VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding AvatarInitial}"
+                                                   Foreground="White"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+
+                                    <!-- 발언자명 + 시각 + 메시지 카드 -->
+                                    <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                        <!-- 헤더 -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                            <TextBlock Text="{Binding Sender}"
+                                                       FontWeight="Bold"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource TextPrimary}"/>
+                                            <TextBlock Text="{Binding TimestampText}"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource TextMuted}"
+                                                       Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <!-- 메시지 카드 -->
+                                        <Border CornerRadius="4,14,14,14"
+                                                Padding="14,10"
+                                                Background="{Binding CardBackground}"
+                                                BorderBrush="{Binding CardBorderBrush}"
+                                                BorderThickness="1"
+                                                MaxWidth="620"
+                                                HorizontalAlignment="Left">
+                                            <TextBlock Text="{Binding Content}"
+                                                       TextWrapping="Wrap"
+                                                       FontSize="13"
+                                                       LineHeight="22"
+                                                       Foreground="#374151"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- 입력 영역 -->
+                <Border Grid.Row="2"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,1,0,0"
+                        Padding="16,12">
+                    <StackPanel>
+                        <!-- 발언자 선택 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <!-- 나 (원형 아바타) -->
+                            <Border x:Name="_senderMeBtn"
+                                    Width="36" Height="36" CornerRadius="18"
+                                    Background="{StaticResource PrimaryBrush}"
+                                    Cursor="Hand" Margin="0,0,8,0"
+                                    MouseDown="SenderBtn_Click" Tag="나">
+                                <TextBlock x:Name="_senderMeLbl"
+                                           Text="나" Foreground="White"
+                                           FontWeight="Bold" FontSize="13"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+
+                            <!-- 제미나이 -->
+                            <Border x:Name="_senderGeminiBtn"
+                                    CornerRadius="18" Padding="14,0" Height="32"
+                                    Background="#D1FAE5" Cursor="Hand" Margin="0,0,6,0"
+                                    MouseDown="SenderBtn_Click" Tag="제미나이">
+                                <TextBlock x:Name="_senderGeminiLbl"
+                                           Text="제미나이" VerticalAlignment="Center"
+                                           Foreground="#065F46" FontSize="13"/>
+                            </Border>
+
+                            <!-- 코파일럿 -->
+                            <Border x:Name="_senderCopilotBtn"
+                                    CornerRadius="18" Padding="14,0" Height="32"
+                                    Background="#DBEAFE" Cursor="Hand" Margin="0,0,6,0"
+                                    MouseDown="SenderBtn_Click" Tag="코파일럿">
+                                <TextBlock x:Name="_senderCopilotLbl"
+                                           Text="코파일럿" VerticalAlignment="Center"
+                                           Foreground="#1D4ED8" FontSize="13"/>
+                            </Border>
+
+                            <!-- 클로드 -->
+                            <Border x:Name="_senderClaudeBtn"
+                                    CornerRadius="18" Padding="14,0" Height="32"
+                                    Background="#FEF3C7" Cursor="Hand"
+                                    MouseDown="SenderBtn_Click" Tag="클로드">
+                                <TextBlock x:Name="_senderClaudeLbl"
+                                           Text="클로드" VerticalAlignment="Center"
+                                           Foreground="#92400E" FontSize="13"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 텍스트 입력 + 전송 버튼 -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 입력 박스 (플레이스홀더 포함) -->
+                            <Border Grid.Column="0"
+                                    CornerRadius="12"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1"
+                                    Background="White"
+                                    Margin="0,0,8,0"
+                                    MinHeight="46">
+                                <Grid VerticalAlignment="Center">
+                                    <TextBox x:Name="_inputTextBox"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             Padding="14,10"
+                                             FontSize="13"
+                                             FontFamily="맑은 고딕"
+                                             Foreground="#374151"
+                                             VerticalContentAlignment="Center"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             MaxHeight="120"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             TextChanged="InputTextBox_TextChanged"
+                                             KeyDown="InputTextBox_KeyDown"/>
+                                    <TextBlock x:Name="_placeholder"
+                                               Text="나의 메시지를 입력하세요..."
+                                               IsHitTestVisible="False"
+                                               Foreground="{StaticResource TextMuted}"
+                                               FontSize="13"
+                                               Margin="14,0,0,0"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 전송 버튼 -->
+                            <Button Grid.Column="1"
+                                    x:Name="_sendBtn"
+                                    Style="{StaticResource SendButtonStyle}"
+                                    Click="Send_Click"
+                                    VerticalAlignment="Bottom">
+                                <TextBlock Text="➤" FontSize="18" Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

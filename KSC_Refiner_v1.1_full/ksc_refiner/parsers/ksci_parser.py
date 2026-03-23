@@ -33,8 +33,8 @@ KSCI_PLAN_IS_MAP = {
     71: (CATEGORY_PL, "판관비", "판관비계"),
 }
 
-IS_PLAN_MONTH_COL_START = 7  # col 7 = Jan(1월)
-IS_PLAN_SHEETS = ["IS DGO", "IS 전장"]
+IS_PLAN_MONTH_COL_START = 7  # col 7 = Jan(1월), G열
+IS_PLAN_SHEETS = ["IS 전장"]
 
 
 class KsciParser(BaseParser):
@@ -69,21 +69,10 @@ class KsciParser(BaseParser):
         return rows
 
     def _extract_section(self, ws, year: str) -> List[AccountRow]:
-        # 월별실적 시트에서 사업부 섹션 자동 탐지 후 레이블 기반 추출
+        # 월별실적 시트: 전장(KSCM-GP) 사업부 데이터는 152행부터 시작 (이전 행은 타 사업부 자료)
         label_rows: dict = {}
 
-        SECTION_KEYWORDS = ("전장", "GP", "KSCM-GP", "KSCI", "북미", "미국", "INTERNATIONAL", "AMERICA")
-
-        start_row = 1
-        for r in range(1, min(ws.max_row, 500) + 1):
-            for c in (1, 2, 3, 4):
-                val = str(ws.cell(row=r, column=c).value or "").replace(" ", "")
-                if any(kw in val.upper() for kw in SECTION_KEYWORDS):
-                    start_row = r + 1
-                    break
-            if start_row != 1:
-                break
-
+        start_row = KSCI_SECTION_START
         scan_end = min(ws.max_row + 1, start_row + 400)
 
         for r in range(start_row, scan_end):

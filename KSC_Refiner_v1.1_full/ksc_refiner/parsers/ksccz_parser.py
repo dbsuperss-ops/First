@@ -59,12 +59,15 @@ MONTHLY_LABEL_MAP = {
     "영업이익":    (CATEGORY_PL, "이익",    "영업이익"),
 }
 
-# 사업계획 파일: 손익계획 시트 (col 5=1월 ~ col 16=12월)
-KSCCZ_PLAN_PL_MAP = {
-    4:  (CATEGORY_PL, "매출",    "매출액"),
-    16: (CATEGORY_PL, "매출원가", "매출원가"),
-    22: (CATEGORY_PL, "이익",    "매출총이익"),
-    24: (CATEGORY_PL, "판관비",  "판관비계"),
+# 사업계획 파일: 손익계획 시트 — 전장사업부 섹션은 180행 이하, 레이블 기반 추출
+KSCCZ_PLAN_SECTION_START = 180
+KSCCZ_PLAN_LABEL_MAP = {
+    "매출액":      (CATEGORY_PL, "매출",    "매출액"),
+    "매출원가":    (CATEGORY_PL, "매출원가", "매출원가"),
+    "매출총이익":  (CATEGORY_PL, "이익",    "매출총이익"),
+    "판관비계":    (CATEGORY_PL, "판관비",  "판관비계"),
+    "판매관리비":  (CATEGORY_PL, "판관비",  "판관비계"),
+    "영업이익":    (CATEGORY_PL, "이익",    "영업이익"),
 }
 # 사업계획 파일: 제조원가계획 시트 (col 5=1월 ~ col 16=12월)
 KSCCZ_PLAN_MC_MAP = {
@@ -122,21 +125,10 @@ class KscczParser(BaseParser):
         return rows
 
     def _extract_monthly_sheet(self, ws, year: str) -> List[AccountRow]:
-        # 손익계산서 (월별) 시트에서 데이터 시작 행 자동 탐지하여 레이블 기반 추출
+        # 손익계산서 (월별) 시트: 전장사업부 데이터는 161행부터 시작 (이전 행은 타 사업부 자료)
         label_rows: dict = {}
 
-        SECTION_KEYWORDS = ("전장", "GP", "KSCM-GP", "KSCCZ", "창저우", "중국", "CHANGZHOU", "CHINA")
-
-        start_row = 1
-        for r in range(1, min(ws.max_row, 500) + 1):
-            for c in (1, 2, 3, 4):
-                val = str(ws.cell(row=r, column=c).value or "").replace(" ", "")
-                if any(kw in val.upper() for kw in SECTION_KEYWORDS):
-                    start_row = r + 1
-                    break
-            if start_row != 1:
-                break
-
+        start_row = MONTHLY_SECTION_START
         scan_end = min(ws.max_row + 1, start_row + 400)
 
         for r in range(start_row, scan_end):
@@ -195,28 +187,49 @@ class KscczParser(BaseParser):
         return rows
 
     def _extract_plan(self, wb) -> List[AccountRow]:
-        """사업계획 파일: 손익계획 + 제조원가계획 시트에서 월별 데이터 추출"""
+        """사업계획 파일: 손익계획 + 제조원가계획 시트에서 월별 데이터 추출 (레이블 기반)"""
         ws_pl = wb["손익계획"]
         year = self._detect_year(ws_pl)
         rows = []
 
+        # 180행 이하에서 레이블 기반으로 행 번호 탐색
+        label_rows: dict = {}
+        start_row = KSCCZ_PLAN_SECTION_START
+        scan_end = min(ws_pl.max_row + 1, start_row + 400)
+
+        for r in range(start_row, scan_end):
+            for c in (1, 2, 3, 4):
+                raw = ws_pl.cell(row=r, column=c).value
+                if raw is None:
+                    continue
+                stripped = str(raw).replace(" ", "").replace("\n", "").strip()
+                import re as _re
+                clean_name = _re.sub(r'^[\dIVXivx\.\-\s]+', '', stripped)
+                for label in KSCCZ_PLAN_LABEL_MAP:
+                    if label not in label_rows and (
+                        clean_name == label or stripped == label or
+                        (len(label) >= 3 and stripped.endswith(label))
+                    ):
+                        label_rows[label] = r
+                        break
+
+        if "매출액" not in label_rows:
+            print(f"  [KSCCZ] 손익계획 시트 (탐색시작: {start_row}행~) 매출액 미발견 — 건너뜀")
+            return []
+
         for month_offset in range(12):
             col = KSCCZ_PLAN_MONTH_COL_START + month_offset
             month_num = month_offset + 1
-            test_val = ws_pl.cell(row=4, column=col).value
+            test_val = ws_pl.cell(row=label_rows["매출액"], column=col).value
             if test_val is None or safe_float(test_val) == 0:
                 continue
             ym = f"{year}-{month_num:02d}"
 
-            for row_num, (cat, sub, account) in KSCCZ_PLAN_PL_MAP.items():
-                val = safe_float(ws_pl.cell(row=row_num, column=col).value)
+            for label, (cat, sub, account) in KSCCZ_PLAN_LABEL_MAP.items():
+                if label not in label_rows:
+                    continue
+                val = safe_float(ws_pl.cell(row=label_rows[label], column=col).value)
                 rows.append(self.make_row(ym, "KSCCZ", cat, sub, account, "RMB", val, 구분="계획"))
-
-            op_profit = (
-                safe_float(ws_pl.cell(row=22, column=col).value) -
-                safe_float(ws_pl.cell(row=24, column=col).value)
-            )
-            rows.append(self.make_row(ym, "KSCCZ", CATEGORY_PL, "이익", "영업이익", "RMB", op_profit, 구분="계획"))
 
             if "제조원가계획" in wb.sheetnames:
                 ws_mc = wb["제조원가계획"]
