@@ -416,17 +416,39 @@ def main(input_dir: str = None, output_dir: str = None, year: str = "2026"):
 
     if input_dir is None:
         input_dir = settings.get("root_path", os.path.join(os.path.dirname(__file__), "..", "input"))
+        # 저장된 경로가 없는 경우 로컬 디렉터리로 Fallback
+        if not os.path.exists(input_dir):
+            if getattr(sys, 'frozen', False):
+                input_dir = os.path.dirname(sys.executable)
+            else:
+                input_dir = os.getcwd()
+
     if output_dir is None:
         saved_output = settings.get("output_path")
-        # Windows 경로가 저장되어 있으면 무시하고 기본값 사용
-        if saved_output and (saved_output.startswith("C:\\") or ":" in saved_output[:3]):
-            output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
-        else:
-            output_dir = saved_output or os.environ.get('KSC_OUTPUT_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), "output"))
+        # 크로스 플랫폼 호환: 현재 OS와 맞지 않는 절대 경로 무시
+        win_path = saved_output and (saved_output.startswith("C:\\") or ":" in saved_output[:3])
+        nix_path = saved_output and saved_output.startswith("/")
+        
+        if (os.name == 'nt' and nix_path) or (os.name != 'nt' and win_path):
+            saved_output = None
+            
+        default_out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+        output_dir = saved_output or os.environ.get('KSC_OUTPUT_DIR', default_out)
 
     # 경로 정규화
     output_dir = os.path.abspath(output_dir)
-    os.makedirs(output_dir, exist_ok=True)
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        # 쓰기 권한 테스트
+        test_file = os.path.join(output_dir, ".write_test")
+        with open(test_file, "w") as f:
+            f.write("t")
+        os.remove(test_file)
+    except (OSError, PermissionError):
+        # 권한 오류 시 내 문서 폴더로 폴백
+        output_dir = os.path.join(os.path.expanduser("~"), "Documents", "KSC_Refiner_Output")
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"⚠ 출력 폴더 쓰기 권한이 없어 내 문서로 변경됨: {output_dir}")
 
     settings["root_path"] = input_dir
     settings["output_path"] = output_dir
