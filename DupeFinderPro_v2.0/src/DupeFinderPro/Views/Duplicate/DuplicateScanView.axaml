@@ -4,8 +4,9 @@
              x:Class="DupeFinderPro.Views.Duplicate.DuplicateScanView"
              x:DataType="vm:DuplicateScanViewModel">
 
-    <ScrollViewer Padding="32 28">
-        <StackPanel Spacing="24">
+    <Grid RowDefinitions="*,Auto">
+        <ScrollViewer Grid.Row="0" Padding="32 28 32 32">
+            <StackPanel Spacing="24">
 
             <!-- ── 헤더 ── -->
             <StackPanel Spacing="4">
@@ -180,7 +181,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:FileTypeCategoryViewModel">
-                                <CheckBox Content="{Binding DisplayName}"
+                                <CheckBox Content="{Binding Label}"
                                           IsChecked="{Binding IsSelected}"
                                           Margin="0 0 16 8"/>
                             </DataTemplate>
@@ -220,11 +221,20 @@
                            TextWrapping="Wrap"/>
             </Border>
 
-            <!-- ── 시작 버튼 ── -->
-            <Button Classes="primary" Content="🔍 스캔 시작"
-                    Command="{Binding StartScanCommand}"
-                    HorizontalAlignment="Left"/>
+            </StackPanel>
+        </ScrollViewer>
 
-        </StackPanel>
-    </ScrollViewer>
+        <!-- ── 하단 고정: 시작 버튼 ── -->
+        <Border Grid.Row="1" Background="{StaticResource CardBgBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0 1 0 0"
+                Padding="32 16">
+            <Grid ColumnDefinitions="*,Auto">
+                <!-- 에러 메시지를 하단 바에 표시할 수도 있지만 기존 위치 유지 -->
+                <Button Grid.Column="1" Classes="primary" Content="🔍 스캔 시작"
+                        Command="{Binding StartScanCommand}"
+                        FontSize="16" Padding="24 12"
+                        HorizontalAlignment="Right"/>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>
