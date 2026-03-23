@@ -333,51 +333,96 @@ def _create_plan_summary(wb, plan_rows):
 
     companies = sorted(set(r.법인코드 for r in plan_rows))
     periods = sorted(set(r.귀속연월 for r in plan_rows))
+    current_ym = datetime.now().strftime("%Y-%m")
+    latest_period = current_ym
 
     key_accounts = ["매출액", "매출원가", "매출총이익", "판관비계", "영업이익"]
 
-    header_font = Font(name="Arial", bold=True, color="FFFFFF", size=10)
-    header_fill = PatternFill("solid", fgColor="375623")  # 녹색 계열 (계획 구분)
-    thin_border = Border(
+    hdr_font = Font(name="Arial", bold=True, color="FFFFFF", size=10)
+    hdr_fill = PatternFill("solid", fgColor="375623")
+    sub_hdr_font = Font(name="Arial", bold=True, size=10)
+    profit_fill = PatternFill("solid", fgColor="E2EFDA")
+    normal_font = Font(name="Arial", size=10)
+    loss_font = Font(name="Arial", size=10, color="FF0000")
+    num_fmt = '#,##0'
+    thin_b = Border(
         left=Side(style="thin", color="D9D9D9"),
         right=Side(style="thin", color="D9D9D9"),
         top=Side(style="thin", color="D9D9D9"),
         bottom=Side(style="thin", color="D9D9D9"),
     )
 
-    headers = ["귀속연월", "계정과목"] + companies + ["합계"]
-    for col_idx, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_idx, value=h)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center")
+    ws.cell(row=1, column=1, value="경신그룹 해외법인 사업계획 종합").font = Font(name="Arial", bold=True, size=14)
+    ws.cell(row=2, column=1, value=f"당월: {latest_period} | 누적: {periods[0]} ~ {latest_period} | 전체: 연간계획 합계 | 단위: 백만원(KRW)").font = Font(name="Arial", size=10, color="808080")
 
-    row_idx = 2
-    for period in periods:
-        for account in key_accounts:
-            ws.cell(row=row_idx, column=1, value=period)
-            ws.cell(row=row_idx, column=2, value=account)
+    row = 4
+    # 헤더: 구분, 계정과목, [법인별 당월계획], [법인별 누적계획], [법인별 전체계획], 합계(전체)
+    headers = (
+        ["구분", "계정과목"]
+        + [f"{c}\n(당월)" for c in companies]
+        + [f"{c}\n(누계)" for c in companies]
+        + [f"{c}\n(전체)" for c in companies]
+        + ["합계\n(전체)"]
+    )
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=ci, value=h)
+        cell.font = hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = thin_b
+    row += 1
 
-            total = 0
-            for comp_idx, comp in enumerate(companies, 3):
-                val = sum(
-                    r.KRW금액 for r in plan_rows
-                    if r.귀속연월 == period and r.법인코드 == comp and r.계정과목 == account
-                )
-                cell = ws.cell(row=row_idx, column=comp_idx, value=val)
-                cell.number_format = '#,##0'
-                cell.border = thin_border
-                total += val
+    def get_plan(corp, acct, period=None, cumulative=False):
+        if period:
+            return sum(r.KRW금액 for r in plan_rows if r.법인코드 == corp and r.계정과목 == acct and r.귀속연월 == period)
+        elif cumulative:
+            return sum(r.KRW금액 for r in plan_rows if r.법인코드 == corp and r.계정과목 == acct and r.귀속연월 <= latest_period)
+        else:
+            return sum(r.KRW금액 for r in plan_rows if r.법인코드 == corp and r.계정과목 == acct)
 
-            total_cell = ws.cell(row=row_idx, column=len(companies) + 3, value=total)
-            total_cell.number_format = '#,##0'
-            total_cell.border = thin_border
-            row_idx += 1
+    n = len(companies)
+    for acct in key_accounts:
+        has_data = any(get_plan(c, acct) != 0 for c in companies)
+        if not has_data:
+            continue
 
-    for i, w in enumerate([12, 14] + [16] * (len(companies) + 1), 1):
-        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+        is_key = acct in ("매출액", "매출원가", "매출총이익", "판관비계", "영업이익")
+        cell_acct = ws.cell(row=row, column=2, value=acct)
+        cell_acct.border = thin_b
+        if is_key:
+            cell_acct.font = sub_hdr_font
+        ws.cell(row=row, column=1).border = thin_b
 
-    ws.freeze_panes = "C2"
+        total_full = 0
+        for ci, comp in enumerate(companies):
+            monthly = get_plan(comp, acct, period=latest_period) / 1_000_000
+            cum = get_plan(comp, acct, cumulative=True) / 1_000_000
+            full = get_plan(comp, acct) / 1_000_000
+
+            for col_offset, val in ((0, monthly), (n, cum), (2 * n, full)):
+                cell = ws.cell(row=row, column=3 + ci + col_offset, value=round(val, 0))
+                cell.number_format = num_fmt
+                cell.border = thin_b
+                cell.font = loss_font if val < 0 else normal_font
+
+            total_full += full
+
+        t_cell = ws.cell(row=row, column=3 + 3 * n, value=round(total_full, 0))
+        t_cell.number_format = num_fmt
+        t_cell.border = thin_b
+        t_cell.font = Font(name="Arial", bold=True, size=10, color="FF0000" if total_full < 0 else "000000")
+
+        if acct in ("매출총이익", "영업이익"):
+            for c in range(1, 3 + 3 * n + 1):
+                ws.cell(row=row, column=c).fill = profit_fill
+
+        row += 1
+
+    col_widths = [10, 16] + [14] * (3 * n + 1)
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[ws.cell(row=4, column=i).column_letter].width = w
+
+    ws.freeze_panes = "C5"
     ws.sheet_properties.tabColor = "375623"
     return ws
 

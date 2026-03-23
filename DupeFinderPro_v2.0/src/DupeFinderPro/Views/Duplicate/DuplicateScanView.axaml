@@ -1,0 +1,182 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DupeFinderPro.ViewModels.Duplicate"
+             x:Class="DupeFinderPro.Views.Duplicate.DuplicateScanView"
+             x:DataType="vm:DuplicateScanViewModel">
+
+    <ScrollViewer Padding="32 28">
+        <StackPanel Spacing="24">
+
+            <!-- ── 헤더 ── -->
+            <StackPanel Spacing="4">
+                <TextBlock Classes="page-title" Text="새 중복 스캔"/>
+                <TextBlock Classes="muted" Text="검색할 폴더를 추가하고 스캔 옵션을 설정합니다."/>
+            </StackPanel>
+
+            <!-- ── 스캔 이름 ── -->
+            <Border Classes="card">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="section-title" Text="스캔 이름"/>
+                    <TextBox Text="{Binding ScanName}"
+                             Watermark="스캔 이름을 입력하세요…"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 검색 폴더 ── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="검색 폴더"/>
+                    <TextBlock Classes="muted"
+                               Text="폴더를 드래그하거나 버튼으로 추가하세요. 최소 1개 필요합니다."/>
+
+                    <!-- 드래그앤드롭 존 -->
+                    <Border x:Name="IncludeDropZone"
+                            Height="80"
+                            CornerRadius="8"
+                            BorderThickness="2"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            Background="#F7FAFC">
+                        <StackPanel VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Spacing="4">
+                            <TextBlock Text="📂 폴더를 여기에 드래그하거나"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <Button Classes="secondary" Content="폴더 추가…"
+                                    HorizontalAlignment="Center"
+                                    Click="BrowseIncludeFolder_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 추가된 폴더 목록 -->
+                    <ItemsControl ItemsSource="{Binding IncludePaths}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Grid ColumnDefinitions="*,Auto" Margin="0 2">
+                                    <Border Classes="badge-blue" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding}"
+                                                   Foreground="{StaticResource StatusBlueBrush}"
+                                                   FontSize="13"/>
+                                    </Border>
+                                    <Button Grid.Column="1" Classes="secondary" Content="✕"
+                                            Margin="4 0 0 0"
+                                            Command="{Binding $parent[ItemsControl].DataContext.RemoveIncludePathCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 제외 폴더 ── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="제외 폴더 (선택사항)"/>
+
+                    <Border x:Name="ExcludeDropZone"
+                            Height="60"
+                            CornerRadius="8"
+                            BorderThickness="2"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            Background="#FFF8F8">
+                        <StackPanel VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Spacing="4">
+                            <TextBlock Text="🚫 제외할 폴더를 드래그하거나"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <Button Classes="secondary" Content="제외 폴더 추가…"
+                                    HorizontalAlignment="Center"
+                                    Click="BrowseExcludeFolder_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding ExcludePaths}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Grid ColumnDefinitions="*,Auto" Margin="0 2">
+                                    <Border CornerRadius="4" Padding="8 4"
+                                            Background="#1AEF4444" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding}"
+                                                   Foreground="{StaticResource StatusRedBrush}"
+                                                   FontSize="13"/>
+                                    </Border>
+                                    <Button Grid.Column="1" Classes="secondary" Content="✕"
+                                            Margin="4 0 0 0"
+                                            Command="{Binding $parent[ItemsControl].DataContext.RemoveExcludePathCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 파일 형식 ── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Classes="section-title" Text="파일 형식"/>
+                        <Button Grid.Column="1" Classes="secondary" Content="전체 선택"
+                                Command="{Binding SelectAllFileTypesCommand}"
+                                Margin="0 0 8 0"/>
+                        <Button Grid.Column="2" Classes="secondary" Content="전체 해제"
+                                Command="{Binding ClearAllFileTypesCommand}"/>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding FileTypeCategories}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FileTypeCategoryViewModel">
+                                <CheckBox Content="{Binding DisplayName}"
+                                          IsChecked="{Binding IsSelected}"
+                                          Margin="0 0 16 8"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 옵션 ── -->
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                    <TextBlock Classes="section-title" Text="스캔 옵션"/>
+                    <CheckBox Content="하위 폴더 포함 (재귀)" IsChecked="{Binding Recursive}"/>
+                    <CheckBox Content="시스템 파일 제외" IsChecked="{Binding ExcludeSystemFiles}"/>
+
+                    <!-- 파일 크기 -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="muted" Text="최소 파일 크기 (KB)"/>
+                        <NumericUpDown Value="{Binding MinSizeKb}" Minimum="0" Increment="1"
+                                       FormatString="0"/>
+                    </StackPanel>
+
+                    <CheckBox Content="최대 파일 크기 지정" IsChecked="{Binding HasMaxSize}"/>
+                    <StackPanel Spacing="6" IsVisible="{Binding HasMaxSize}">
+                        <TextBlock Classes="muted" Text="최대 파일 크기 (KB)"/>
+                        <NumericUpDown Value="{Binding MaxSizeKb}" Minimum="1" Increment="1"
+                                       FormatString="0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 유효성 오류 ── -->
+            <Border Classes="card" Background="#FFF3F3"
+                    IsVisible="{Binding HasValidationError}">
+                <TextBlock Foreground="{StaticResource StatusRedBrush}"
+                           Text="{Binding ValidationError}"
+                           TextWrapping="Wrap"/>
+            </Border>
+
+            <!-- ── 시작 버튼 ── -->
+            <Button Classes="primary" Content="🔍 스캔 시작"
+                    Command="{Binding StartScanCommand}"
+                    HorizontalAlignment="Left"/>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

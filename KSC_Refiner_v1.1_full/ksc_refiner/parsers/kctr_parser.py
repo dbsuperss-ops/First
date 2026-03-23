@@ -37,7 +37,7 @@ KCTR_PLAN_MAP = {
     43: (CATEGORY_PL, "판관비",  "관리비"),
     70: (CATEGORY_PL, "이익",    "영업이익"),
 }
-KCTR_PLAN_MONTH_COL_START = 5  # E column = 1월
+KCTR_PLAN_MONTH_COL_START = 6  # F column = 1월
 
 class KctrParser(BaseParser):
     def extract(self) -> List[AccountRow]:

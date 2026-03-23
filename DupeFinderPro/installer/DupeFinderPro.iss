@@ -31,7 +31,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "바탕화면에 바로가기 만들기"; GroupDescription: "추가 작업:"; Flags: unchecked
 
 [Files]
-Source: "..\src\DupeFinderPro\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\src\DupeFinderPro\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
