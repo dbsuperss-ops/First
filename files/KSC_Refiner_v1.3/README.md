@@ -56,27 +56,59 @@ KSC_Refiner_v1.3/
 
 ## 설치 및 실행
 
-### 1. 의존성 설치
+### Windows 사용자 (권장)
+
+**1. 설치 프로그램 사용**
+```
+1. installer_output\KscRefiner_Setup_v1.3.0.exe 실행
+2. 설치 마법사 따라 설치
+3. 바탕화면 또는 시작메뉴에서 "KSC Settlement Refiner" 실행
+```
+
+**2. 실행 방법**
+- 프로그램 실행 → 폴더 선택 → 연도 입력 → 자동 처리
+- 완료 후 output 폴더에 통합 DB 생성
+
+### 개발자 / Python 직접 실행
+
+**1. 의존성 설치**
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. 실행
+**2. 실행**
 ```bash
 python ksc_refiner.py <입력디렉토리> [연도]
 ```
 
 예시:
 ```bash
-python ksc_refiner.py /home/gabriel/first/files 2026
+python ksc_refiner.py C:\Users\user\Documents\files 2026
 ```
 
-### 3. 출력
+**3. 출력**
 - 통합 DB: `output/consolidated_db_YYYYMMDD_HHMMSS.xlsx`
 - 3개 시트:
   - **통합_DB**: 전체 데이터
   - **법인별_요약**: 주요 계정과목 요약
   - **경영보고서**: 경영진용 종합 리포트
+
+## Windows 빌드 (개발자용)
+
+### 요구사항
+- Python 3.8+ with PyInstaller
+- .NET 8.0 SDK
+- Inno Setup 6 (선택사항 - 설치 파일 생성용)
+
+### 빌드 실행
+```cmd
+build.bat
+```
+
+빌드 결과:
+- `publish\ksc_engine.exe` - Python 엔진
+- `publish\KscRefiner_v1.3.exe` - C# 런처
+- `installer_output\KscRefiner_Setup_v1.3.0.exe` - 설치 프로그램
 
 ## 설정 파일
 
