@@ -2,10 +2,12 @@
 bin/
 obj/
 publish/
+installer_output/
 *.exe
 *.dll
 *.pdb
 *.zst
+*.zip
 
 # Extensions (large binaries)
 extensions/
