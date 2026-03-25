@@ -24,7 +24,7 @@
       "electron/main.cjs"
     ],
     "win": {
-      "target": "nsis"
+      "target": "dir"
     },
     "nsis": {
       "oneClick": false,
