@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Box, Star } from "lucide-react"
 import type { Brick } from "@/types"
 import { CATEGORY_COLORS, CATEGORY_BADGE_COLORS } from "@/lib/store"
@@ -8,11 +9,13 @@ interface BrickCardProps {
   brick: Brick
   className?: string
   onClick?: () => void
+  onRate?: (rating: number) => void
 }
 
-export function BrickCard({ brick, className, onClick }: BrickCardProps) {
+export function BrickCard({ brick, className, onClick, onRate }: BrickCardProps) {
   const gradientClass = CATEGORY_COLORS[brick.category] ?? "from-gray-500 to-gray-400"
   const badgeClass = CATEGORY_BADGE_COLORS[brick.category] ?? "bg-gray-100 text-gray-700"
+  const [hoverRating, setHoverRating] = useState(0)
 
   return (
     <div
@@ -63,9 +66,13 @@ export function BrickCard({ brick, className, onClick }: BrickCardProps) {
               <Star
                 key={i}
                 className={cn(
-                  "h-3 w-3",
-                  i < brick.rating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
+                  "h-3 w-3 transition-transform",
+                  i < (hoverRating || brick.rating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground",
+                  onRate && "cursor-pointer hover:scale-125"
                 )}
+                onClick={onRate ? (e) => { e.stopPropagation(); onRate(i + 1) } : undefined}
+                onMouseEnter={onRate ? () => setHoverRating(i + 1) : undefined}
+                onMouseLeave={onRate ? () => setHoverRating(0) : undefined}
               />
             ))}
           </div>

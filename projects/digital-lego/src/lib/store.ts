@@ -26,7 +26,10 @@ export const CATEGORY_BADGE_COLORS: Record<string, string> = {
 
 export const TAGS = ["Finance", "HR", "Purchase", "Quality", "Dashboard"];
 
-let bricks: Brick[] = [
+const BRICKS_KEY = "dl_bricks";
+const ASSEMBLIES_KEY = "dl_assemblies";
+
+const SAMPLE_BRICKS: Brick[] = [
   {
     id: "1",
     name: "월간 손익계산서 리포트",
@@ -101,13 +104,13 @@ let bricks: Brick[] = [
   },
 ];
 
-let assemblies: Assembly[] = [
+const SAMPLE_ASSEMBLIES: Assembly[] = [
   {
     id: "a1",
     name: "월간 재무 보고 시스템",
     author: "김재무",
     description: "손익계산서와 급여 명세서를 통합한 완전한 월간 재무 보고 시스템",
-    bricks: [bricks[0], bricks[5]],
+    bricks: [SAMPLE_BRICKS[0], SAMPLE_BRICKS[5]],
     status: "Published",
     createdAt: "2024-02-05",
   },
@@ -116,11 +119,27 @@ let assemblies: Assembly[] = [
     name: "HR 통합 관리 시스템",
     author: "이인사",
     description: "신규 입사자 온보딩과 급여 처리를 통합 관리",
-    bricks: [bricks[1], bricks[5]],
+    bricks: [SAMPLE_BRICKS[1], SAMPLE_BRICKS[5]],
     status: "Published",
     createdAt: "2024-02-08",
   },
 ];
+
+function loadFromStorage<T>(key: string, fallback: T[]): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as T[];
+  } catch {}
+  return fallback;
+}
+
+let bricks: Brick[] = loadFromStorage<Brick>(BRICKS_KEY, SAMPLE_BRICKS);
+let assemblies: Assembly[] = loadFromStorage<Assembly>(ASSEMBLIES_KEY, SAMPLE_ASSEMBLIES);
+
+function persist(): void {
+  localStorage.setItem(BRICKS_KEY, JSON.stringify(bricks));
+  localStorage.setItem(ASSEMBLIES_KEY, JSON.stringify(assemblies));
+}
 
 export function getBricks(): Brick[] {
   return [...bricks];
@@ -137,15 +156,18 @@ export function addBrick(brick: Omit<Brick, "id" | "createdAt">): Brick {
     createdAt: new Date().toISOString().split("T")[0],
   };
   bricks = [...bricks, newBrick];
+  persist();
   return newBrick;
 }
 
 export function updateBrick(id: string, updates: Partial<Brick>): void {
   bricks = bricks.map((b) => (b.id === id ? { ...b, ...updates } : b));
+  persist();
 }
 
 export function deleteBrick(id: string): void {
   bricks = bricks.filter((b) => b.id !== id);
+  persist();
 }
 
 export function addAssembly(assembly: Omit<Assembly, "id" | "createdAt">): Assembly {
@@ -155,5 +177,16 @@ export function addAssembly(assembly: Omit<Assembly, "id" | "createdAt">): Assem
     createdAt: new Date().toISOString().split("T")[0],
   };
   assemblies = [...assemblies, newAssembly];
+  persist();
   return newAssembly;
+}
+
+export function updateAssembly(id: string, updates: Partial<Assembly>): void {
+  assemblies = assemblies.map((a) => (a.id === id ? { ...a, ...updates } : a));
+  persist();
+}
+
+export function deleteAssembly(id: string): void {
+  assemblies = assemblies.filter((a) => a.id !== id);
+  persist();
 }
