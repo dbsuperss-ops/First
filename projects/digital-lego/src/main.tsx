@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createHashRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
 import Layout from './pages/_layout'
 import Dashboard from './pages/index'
@@ -10,7 +10,7 @@ import Assemble from './pages/assemble'
 import MyBricks from './pages/my-bricks'
 import NotFound from './pages/not-found'
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     path: '/',
     element: <Layout />,
