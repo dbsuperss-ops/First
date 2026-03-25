@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { Search, Grid3X3, List, Box } from "lucide-react"
-import { getBricks } from "@/lib/store"
+import { getBricks, updateBrick } from "@/lib/store"
 import type { Brick, BrickCategory, BrickType } from "@/types"
 import { BrickCard } from "@/components/BrickCard"
 import { Input } from "@/components/ui/input"
@@ -158,7 +158,14 @@ export default function Storage() {
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((brick) => (
-            <BrickCard key={brick.id} brick={brick} />
+            <BrickCard
+              key={brick.id}
+              brick={brick}
+              onRate={(rating) => {
+                updateBrick(brick.id, { rating })
+                setBricks(getBricks())
+              }}
+            />
           ))}
         </div>
       ) : (

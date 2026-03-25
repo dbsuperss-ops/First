@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { Bot, Send, User, Loader2, Plus, X, Sparkles } from "lucide-react"
+import { Bot, Send, User, Loader2, Plus, X, Sparkles, Key, CheckCircle2 } from "lucide-react"
 import type { BrickCategory, BrickType, BrickStatus } from "@/types"
 import { addBrick, TAGS } from "@/lib/store"
 import { Button } from "@/components/ui/button"
@@ -50,11 +50,10 @@ const AI_RESPONSES: Record<string, { name: string; description: string; category
   },
 }
 
-function getAiResponse(input: string): typeof AI_RESPONSES[string] {
+function getKeywordSuggestion(input: string): typeof AI_RESPONSES[string] {
   for (const key of Object.keys(AI_RESPONSES)) {
     if (input.includes(key)) return AI_RESPONSES[key]
   }
-  // Default
   return {
     name: "업무 자동화 브릭",
     description: "반복적인 업무 프로세스를 자동화하는 브릭입니다. 데이터 수집, 처리, 보고서 생성을 자동으로 수행합니다.",
@@ -62,6 +61,8 @@ function getAiResponse(input: string): typeof AI_RESPONSES[string] {
     tags: ["Dashboard"],
   }
 }
+
+const API_KEY_STORAGE = "claude_api_key"
 
 export default function Create() {
   const navigate = useNavigate()
@@ -75,6 +76,11 @@ export default function Create() {
   const [isLoading, setIsLoading] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  // API key state
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) ?? "")
+  const [apiKeyInput, setApiKeyInput] = useState("")
+  const [showKeyInput, setShowKeyInput] = useState(false)
+
   // Form state
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -87,6 +93,15 @@ export default function Create() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
+  const saveApiKey = () => {
+    const trimmed = apiKeyInput.trim()
+    if (!trimmed) return
+    localStorage.setItem(API_KEY_STORAGE, trimmed)
+    setApiKey(trimmed)
+    setApiKeyInput("")
+    setShowKeyInput(false)
+  }
+
   const handleSendMessage = async () => {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
@@ -96,19 +111,61 @@ export default function Create() {
     setInputValue("")
     setIsLoading(true)
 
-    await new Promise((res) => setTimeout(res, 1500))
+    try {
+      if (window.electronAPI && apiKey) {
+        // Real Claude API call via Electron IPC
+        const raw = await window.electronAPI.callClaude(apiKey, [{ role: "user", content: trimmed }])
 
-    const suggestion = getAiResponse(trimmed)
-    const aiResponse: ChatMessage = {
-      role: "assistant",
-      content: `좋은 아이디어네요! "${suggestion.name}" 브릭을 추천드립니다.\n\n${suggestion.description}\n\n오른쪽 폼에 내용을 자동으로 채워드렸습니다. 필요에 따라 수정하세요!`,
+        let suggestion: { name: string; description: string; category: BrickCategory; tags: string[]; message?: string }
+        try {
+          // Strip markdown code fences if present
+          const jsonStr = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+          suggestion = JSON.parse(jsonStr)
+        } catch {
+          // Fallback: treat raw as plain message
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: raw },
+          ])
+          setIsLoading(false)
+          return
+        }
+
+        const aiMessage = suggestion.message
+          ? suggestion.message
+          : `"${suggestion.name}" 브릭을 추천드립니다!\n\n${suggestion.description}\n\n오른쪽 폼에 내용을 자동으로 채워드렸습니다.`
+
+        setMessages((prev) => [...prev, { role: "assistant", content: aiMessage }])
+        setName(suggestion.name)
+        setDescription(suggestion.description)
+        if (CATEGORIES.includes(suggestion.category as BrickCategory)) {
+          setCategory(suggestion.category as BrickCategory)
+        }
+        setSelectedTags(suggestion.tags.filter((t) => TAGS.includes(t)))
+      } else {
+        // Keyword fallback
+        await new Promise((res) => setTimeout(res, 1500))
+        const suggestion = getKeywordSuggestion(trimmed)
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `좋은 아이디어네요! "${suggestion.name}" 브릭을 추천드립니다.\n\n${suggestion.description}\n\n오른쪽 폼에 내용을 자동으로 채워드렸습니다. 필요에 따라 수정하세요!`,
+          },
+        ])
+        setName(suggestion.name)
+        setDescription(suggestion.description)
+        setCategory(suggestion.category)
+        setSelectedTags(suggestion.tags)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `오류가 발생했습니다: ${msg}` },
+      ])
     }
 
-    setMessages((prev) => [...prev, aiResponse])
-    setName(suggestion.name)
-    setDescription(suggestion.description)
-    setCategory(suggestion.category)
-    setSelectedTags(suggestion.tags)
     setIsLoading(false)
   }
 
@@ -158,10 +215,46 @@ export default function Create() {
               <p className="text-sm font-semibold">AI 브릭 어시스턴트</p>
               <p className="text-xs text-muted-foreground">업무 브릭 생성을 도와드립니다</p>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {apiKey ? (
+                <button
+                  onClick={() => { setApiKey(""); localStorage.removeItem(API_KEY_STORAGE) }}
+                  className="flex items-center gap-1.5 text-xs text-green-600 hover:text-red-500 transition-colors"
+                  title="클릭하여 API 키 제거"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Claude AI 연결됨</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowKeyInput((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  title="Claude API 키 입력"
+                >
+                  <Key className="h-3.5 w-3.5" />
+                  <span>API 키 설정</span>
+                </button>
+              )}
               <Sparkles className="h-4 w-4 text-yellow-500" />
             </div>
           </div>
+
+          {/* API key input area */}
+          {showKeyInput && !apiKey && (
+            <div className="px-4 py-2.5 border-b bg-muted/20 flex gap-2">
+              <Input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveApiKey() }}
+                placeholder="sk-ant-..."
+                className="text-xs h-8 flex-1"
+              />
+              <Button size="sm" className="h-8 text-xs" onClick={saveApiKey} disabled={!apiKeyInput.trim()}>
+                저장
+              </Button>
+            </div>
+          )}
 
           {/* Messages */}
           <div className="flex-1 overflow-auto p-4 space-y-4">
