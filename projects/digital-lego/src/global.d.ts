@@ -1,3 +1,13 @@
+// Electron webview JSX support
+declare namespace JSX {
+  interface IntrinsicElements {
+    webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      src?: string
+      style?: React.CSSProperties
+    }
+  }
+}
+
 interface Window {
   electronAPI?: {
     readStore:  (key: string) => Promise<unknown>
