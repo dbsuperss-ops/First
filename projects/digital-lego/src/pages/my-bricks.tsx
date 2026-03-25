@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { Pencil, Trash2, Box, Layers, CheckCircle2, FileEdit, Plus } from "lucide-react"
 import { Link } from "react-router-dom"
-import { getBricks, getAssemblies, updateBrick, deleteBrick } from "@/lib/store"
+import { getBricks, getAssemblies, updateBrick, deleteBrick, updateAssembly, deleteAssembly } from "@/lib/store"
 import type { Brick, Assembly, BrickCategory, BrickType, BrickStatus } from "@/types"
 import { BrickCard } from "@/components/BrickCard"
 import { AssemblyCard } from "@/components/AssemblyCard"
@@ -28,13 +28,20 @@ export default function MyBricks() {
   const [assemblies, setAssemblies] = useState<Assembly[]>([])
   const [editingBrick, setEditingBrick] = useState<Brick | null>(null)
   const [deletingBrick, setDeletingBrick] = useState<Brick | null>(null)
+  const [editingAssembly, setEditingAssembly] = useState<Assembly | null>(null)
+  const [deletingAssembly, setDeletingAssembly] = useState<Assembly | null>(null)
 
-  // Edit form state
+  // Brick edit form state
   const [editName, setEditName] = useState("")
   const [editDescription, setEditDescription] = useState("")
   const [editCategory, setEditCategory] = useState<BrickCategory>("재무")
   const [editType, setEditType] = useState<BrickType>("단일")
   const [editStatus, setEditStatus] = useState<BrickStatus>("Draft")
+
+  // Assembly edit form state
+  const [editAssemblyName, setEditAssemblyName] = useState("")
+  const [editAssemblyDesc, setEditAssemblyDesc] = useState("")
+  const [editAssemblyStatus, setEditAssemblyStatus] = useState<BrickStatus>("Draft")
 
   const refresh = () => {
     setBricks(getBricks())
@@ -77,6 +84,31 @@ export default function MyBricks() {
     if (!deletingBrick) return
     deleteBrick(deletingBrick.id)
     setDeletingBrick(null)
+    refresh()
+  }
+
+  const openEditAssembly = (assembly: Assembly) => {
+    setEditingAssembly(assembly)
+    setEditAssemblyName(assembly.name)
+    setEditAssemblyDesc(assembly.description)
+    setEditAssemblyStatus(assembly.status)
+  }
+
+  const handleSaveAssemblyEdit = () => {
+    if (!editingAssembly || !editAssemblyName.trim()) return
+    updateAssembly(editingAssembly.id, {
+      name: editAssemblyName.trim(),
+      description: editAssemblyDesc.trim(),
+      status: editAssemblyStatus,
+    })
+    setEditingAssembly(null)
+    refresh()
+  }
+
+  const handleDeleteAssembly = () => {
+    if (!deletingAssembly) return
+    deleteAssembly(deletingAssembly.id)
+    setDeletingAssembly(null)
     refresh()
   }
 
@@ -154,7 +186,10 @@ export default function MyBricks() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {myBricks.map((brick) => (
               <div key={brick.id} className="group relative">
-                <BrickCard brick={brick} />
+                <BrickCard
+                  brick={brick}
+                  onRate={(rating) => { updateBrick(brick.id, { rating }); refresh() }}
+                />
                 {/* Action overlay */}
                 <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
@@ -195,13 +230,31 @@ export default function MyBricks() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {myAssemblies.map((assembly) => (
-              <AssemblyCard key={assembly.id} assembly={assembly} />
+              <div key={assembly.id} className="group relative">
+                <AssemblyCard assembly={assembly} />
+                <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => openEditAssembly(assembly)}
+                    className="p-1.5 rounded-lg bg-white/90 border shadow-sm hover:bg-white transition-all"
+                    title="편집"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-foreground" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingAssembly(assembly)}
+                    className="p-1.5 rounded-lg bg-white/90 border shadow-sm hover:bg-destructive hover:text-white transition-all"
+                    title="삭제"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* Edit Dialog */}
+      {/* Brick Edit Dialog */}
       <Dialog open={!!editingBrick} onOpenChange={(open) => !open && setEditingBrick(null)}>
         <DialogContent>
           <DialogHeader>
@@ -288,7 +341,7 @@ export default function MyBricks() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Brick Delete Confirmation Dialog */}
       <Dialog open={!!deletingBrick} onOpenChange={(open) => !open && setDeletingBrick(null)}>
         <DialogContent>
           <DialogHeader>
@@ -301,6 +354,72 @@ export default function MyBricks() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeletingBrick(null)}>취소</Button>
             <Button variant="destructive" onClick={handleDelete}>삭제</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assembly Edit Dialog */}
+      <Dialog open={!!editingAssembly} onOpenChange={(open) => !open && setEditingAssembly(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>조립체 편집</DialogTitle>
+            <DialogDescription>조립체 정보를 수정하세요 (브릭 구성 변경은 조립 페이지에서)</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">시스템 이름 *</label>
+              <Input value={editAssemblyName} onChange={(e) => setEditAssemblyName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">설명</label>
+              <Textarea
+                value={editAssemblyDesc}
+                onChange={(e) => setEditAssemblyDesc(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">상태</label>
+              <div className="flex gap-2">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setEditAssemblyStatus(s)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      editAssemblyStatus === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {s === "Published" ? "발행" : "초안"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingAssembly(null)}>취소</Button>
+            <Button onClick={handleSaveAssemblyEdit} disabled={!editAssemblyName.trim()}>저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assembly Delete Confirmation Dialog */}
+      <Dialog open={!!deletingAssembly} onOpenChange={(open) => !open && setDeletingAssembly(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>조립체 삭제</DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold text-foreground">"{deletingAssembly?.name}"</span>을(를) 삭제하시겠습니까?
+              이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingAssembly(null)}>취소</Button>
+            <Button variant="destructive" onClick={handleDeleteAssembly}>삭제</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
