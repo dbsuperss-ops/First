@@ -1,4 +1,4 @@
-import { Brick, Assembly } from "@/types";
+import type { Brick, Assembly } from "@/types";
 
 export const CATEGORY_COLORS: Record<string, string> = {
   재무: "from-blue-500 to-blue-400",
