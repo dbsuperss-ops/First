@@ -9,6 +9,7 @@ import Storage from './pages/storage'
 import Assemble from './pages/assemble'
 import MyBricks from './pages/my-bricks'
 import NotFound from './pages/not-found'
+import { initStore } from './lib/store'
 
 const router = createHashRouter([
   {
@@ -25,8 +26,13 @@ const router = createHashRouter([
   { path: '*', element: <NotFound /> },
 ])
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>,
-)
+async function bootstrap() {
+  await initStore()
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <RouterProvider router={router} />
+    </StrictMode>,
+  )
+}
+
+void bootstrap()
