@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "cross-env NODE_ENV=development concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-packager . \"Digital Lego\" --platform=win32 --arch=x64 --out=release --overwrite --ignore=node_modules --ignore=src --ignore=.git",
+    "electron:build": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
     "electron:preview": "npm run build && cross-env NODE_ENV=production electron ."
   },
   "build": {
@@ -25,7 +25,8 @@
       "electron/preload.cjs"
     ],
     "win": {
-      "target": "dir"
+      "target": "nsis",
+      "icon": "Digital_Lego.ico"
     },
     "nsis": {
       "oneClick": false,
