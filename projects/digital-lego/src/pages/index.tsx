@@ -52,7 +52,7 @@ export default function Dashboard() {
               </Button>
             </Link>
             <Link to="/assemble">
-              <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 w-full gap-2">
+              <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10 w-full gap-2">
                 <Layers className="h-4 w-4" />
                 브릭 조립하기
               </Button>
