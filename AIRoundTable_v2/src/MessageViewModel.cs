@@ -1,4 +1,3 @@
-using System.Windows;
 using System.Windows.Media;
 using AIRoundTable.Models;
 
@@ -6,15 +5,12 @@ namespace AIRoundTable;
 
 public class MessageViewModel
 {
-    private record ModelStyle(
-        string Avatar, string CardBg, string CardBorder, bool RightAlign);
-
-    private static readonly Dictionary<string, ModelStyle> Styles = new()
+    private static readonly Dictionary<string, (Brush Avatar, Brush Card, Brush Border)> Colors = new()
     {
-        ["나"]     = new("#3B82F6", "#0D1929", "#1E3A6E", true),
-        ["제미나이"] = new("#10B981", "#081F15", "#103D28", false),
-        ["코파일럿"] = new("#0078D4", "#081526", "#0E2545", false),
-        ["클로드"]   = new("#D97706", "#1A1005", "#3D2A0A", false),
+        ["나"]     = (Brush("#7C3AED"), Brush("#FFFFFF"), Brush("#E5E7EB")),
+        ["제미나이"] = (Brush("#10B981"), Brush("#F0FDF4"), Brush("#D1FAE5")),
+        ["코파일럿"] = (Brush("#3B82F6"), Brush("#EFF6FF"), Brush("#DBEAFE")),
+        ["클로드"]   = (Brush("#F59E0B"), Brush("#FFFBEB"), Brush("#FEF3C7")),
     };
 
     private static readonly Dictionary<string, string> Initials = new()
@@ -22,16 +18,14 @@ public class MessageViewModel
         ["나"] = "나", ["제미나이"] = "G", ["코파일럿"] = "C", ["클로드"] = "A",
     };
 
-    public Message    Source          { get; }
-    public string     Sender          { get; }
-    public string     Content         { get; }
-    public string     TimestampText   { get; }
-    public string     AvatarInitial   { get; }
-    public Brush      AvatarBrush     { get; }
-    public Brush      CardBackground  { get; }
-    public Brush      CardBorderBrush { get; }
-    public Visibility LeftVisibility  { get; }
-    public Visibility RightVisibility { get; }
+    public Message Source        { get; }
+    public string  Sender        { get; }
+    public string  Content       { get; }
+    public string  TimestampText { get; }
+    public string  AvatarInitial { get; }
+    public Brush   AvatarBrush   { get; }
+    public Brush   CardBackground  { get; }
+    public Brush   CardBorderBrush { get; }
 
     public MessageViewModel(Message msg)
     {
@@ -42,25 +36,21 @@ public class MessageViewModel
         AvatarInitial = Initials.GetValueOrDefault(msg.Sender,
                             msg.Sender.Length > 0 ? msg.Sender[0].ToString() : "?");
 
-        if (Styles.TryGetValue(msg.Sender, out var s))
+        if (Colors.TryGetValue(msg.Sender, out var c))
         {
-            AvatarBrush     = Hex(s.Avatar);
-            CardBackground  = Hex(s.CardBg);
-            CardBorderBrush = Hex(s.CardBorder);
-            LeftVisibility  = s.RightAlign ? Visibility.Collapsed : Visibility.Visible;
-            RightVisibility = s.RightAlign ? Visibility.Visible   : Visibility.Collapsed;
+            AvatarBrush     = c.Avatar;
+            CardBackground  = c.Card;
+            CardBorderBrush = c.Border;
         }
         else
         {
-            AvatarBrush     = Hex("#64748B");
-            CardBackground  = Hex("#141B2D");
-            CardBorderBrush = Hex("#2A3550");
-            LeftVisibility  = Visibility.Visible;
-            RightVisibility = Visibility.Collapsed;
+            AvatarBrush     = Brush("#6B7280");
+            CardBackground  = Brush("#FFFFFF");
+            CardBorderBrush = Brush("#E5E7EB");
         }
     }
 
-    private static SolidColorBrush Hex(string hex)
+    private static SolidColorBrush Brush(string hex)
     {
         var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
         b.Freeze();
