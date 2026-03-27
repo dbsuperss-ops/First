@@ -159,10 +159,29 @@ public partial class MainWindow : Window
             Margin     = new Thickness(0, 8, 0, 8),
         };
 
+        var copyBtn = new Button
+        {
+            Content             = "발언 복사",
+            FontSize            = 10,
+            Foreground          = HexBrush("#94A3B8"),
+            Background          = System.Windows.Media.Brushes.Transparent,
+            BorderThickness     = new Thickness(0),
+            Cursor              = System.Windows.Input.Cursors.Hand,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Padding             = new Thickness(0, 4, 0, 0),
+        };
+        var rb = responseBlock;
+        copyBtn.Click += (_, _) =>
+        {
+            if (!string.IsNullOrWhiteSpace(rb.Text) && rb.Text != "응답 대기 중...")
+                Clipboard.SetText(rb.Text);
+        };
+
         var body = new StackPanel { Margin = new Thickness(12, 10, 12, 12) };
         body.Children.Add(header);
         body.Children.Add(divider);
         body.Children.Add(responseBlock);
+        body.Children.Add(copyBtn);
 
         var panel = new Border
         {
@@ -187,6 +206,10 @@ public partial class MainWindow : Window
 
     private void History_Click(object sender, RoutedEventArgs e)
         => MessageBox.Show("히스토리 기능은 준비 중입니다.", "알림",
+               MessageBoxButton.OK, MessageBoxImage.Information);
+
+    private void Statistics_Click(object sender, RoutedEventArgs e)
+        => MessageBox.Show("통계 기능은 준비 중입니다.", "알림",
                MessageBoxButton.OK, MessageBoxImage.Information);
 
     // ── 새 토론 시작 ──────────────────────────────────────────────────────
