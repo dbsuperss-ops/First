@@ -289,13 +289,13 @@ public partial class MainWindow : Window
     private IReadOnlyList<SenderStyle> BuildSenderStyles() => new[]
     {
         new SenderStyle(_senderMeBtn,      _senderMeLbl,
-                        "#3B82F6", "White",   "#0D1929", "#3B82F6"),
+                        "#7C3AED", "White",   "#F3F4F6", "#6B7280"),
         new SenderStyle(_senderGeminiBtn,  _senderGeminiLbl,
-                        "#10B981", "White",   "#081F15", "#10B981"),
+                        "#10B981", "White",   "#D1FAE5", "#065F46"),
         new SenderStyle(_senderCopilotBtn, _senderCopilotLbl,
-                        "#0078D4", "White",   "#081526", "#0078D4"),
+                        "#3B82F6", "White",   "#DBEAFE", "#1D4ED8"),
         new SenderStyle(_senderClaudeBtn,  _senderClaudeLbl,
-                        "#D97706", "White",   "#1A1005", "#D97706"),
+                        "#F59E0B", "White",   "#FEF3C7", "#92400E"),
     };
 
     // ── 컨텍스트 메뉴 헬퍼 ────────────────────────────────────────────────
@@ -322,24 +322,20 @@ public partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Owner  = this,
             ResizeMode   = ResizeMode.NoResize,
-            FontFamily   = new FontFamily("Segoe UI"),
-            Background   = HexBrush("#0F1626"),
+            FontFamily   = new FontFamily("맑은 고딕"),
+            Background   = new SolidColorBrush(Colors.White),
         };
         var panel = new StackPanel { Margin = new Thickness(20) };
-        var lbl   = new TextBlock  { Text = prompt, Margin = new Thickness(0, 0, 0, 8), Foreground = HexBrush("#94A3B8") };
+        var lbl   = new TextBlock  { Text = prompt, Margin = new Thickness(0, 0, 0, 8), Foreground = HexBrush("#374151") };
         var input = new TextBox    { Text = defaultValue, Padding = new Thickness(8, 6, 8, 6),
-                                     Background = HexBrush("#141B2D"), Foreground = HexBrush("#E2E8F0"),
-                                     BorderBrush = HexBrush("#1E2A40"), BorderThickness = new Thickness(1),
-                                     CaretBrush = HexBrush("#E2E8F0") };
+                                     BorderBrush = HexBrush("#E5E7EB"), BorderThickness = new Thickness(1) };
         var btnRow = new StackPanel { Orientation = Orientation.Horizontal,
                                       HorizontalAlignment = HorizontalAlignment.Right,
                                       Margin = new Thickness(0, 12, 0, 0) };
         var ok     = new Button { Content = "확인", Width = 76, Height = 32,
-                                   Background = HexBrush("#3B82F6"), Foreground = new SolidColorBrush(Colors.White),
+                                   Background = HexBrush("#7C3AED"), Foreground = new SolidColorBrush(Colors.White),
                                    BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, 8, 0) };
-        var cancel = new Button { Content = "취소", Width = 76, Height = 32,
-                                   Background = HexBrush("#1E2A40"), Foreground = HexBrush("#94A3B8"),
-                                   BorderThickness = new Thickness(0) };
+        var cancel = new Button { Content = "취소",  Width = 76, Height = 32 };
 
         string? result = null;
         ok.Click     += (_, _) => { result = input.Text; dlg.Close(); };
