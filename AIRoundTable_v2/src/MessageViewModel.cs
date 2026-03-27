@@ -7,7 +7,7 @@ public class MessageViewModel
 {
     private static readonly Dictionary<string, (Brush Avatar, Brush Card, Brush Border)> _colors = new()
     {
-        ["나"] = (HexBrush("#7C3AED"), HexBrush("#FFFFFF"), HexBrush("#E5E7EB")),
+        ["나"] = (HexBrush("#3B82F6"), HexBrush("#EFF6FF"), HexBrush("#BFDBFE")),
     };
 
     /// <summary>
@@ -16,7 +16,7 @@ public class MessageViewModel
     public static void RegisterColors(IEnumerable<AiModelConfig> models)
     {
         _colors.Clear();
-        _colors["나"] = (HexBrush("#7C3AED"), HexBrush("#FFFFFF"), HexBrush("#E5E7EB"));
+        _colors["나"] = (HexBrush("#3B82F6"), HexBrush("#EFF6FF"), HexBrush("#BFDBFE"));
 
         foreach (var m in models)
         {
