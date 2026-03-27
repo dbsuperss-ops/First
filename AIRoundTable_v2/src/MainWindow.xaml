@@ -304,8 +304,7 @@
                             Padding="14,10">
                         <TextBlock Text="세션 목록"
                                    FontSize="10" FontFamily="Consolas"
-                                   FontWeight="Bold" Foreground="#3D5070"
-                                   CharacterSpacing="200"/>
+                                   FontWeight="Bold" Foreground="#3D5070"/>
                     </Border>
 
                     <!-- 새 원탁 버튼 -->
