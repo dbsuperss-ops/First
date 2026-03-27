@@ -1,6 +1,0 @@
-=== KSCCZ: º’¿Õ∞Ë»π ===
-  [Ω√∆Æ: º’¿Õ∞Ë»π]
-Traceback (most recent call last):
-  File "<stdin>", line 23, in <module>
-  File "<stdin>", line 19, in dump_sheet
-UnicodeEncodeError: 'cp949' codec can't encode character '\u7ecf' in position 17: illegal multibyte sequence

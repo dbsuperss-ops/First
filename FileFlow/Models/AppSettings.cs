@@ -1,1 +1,0 @@
-namespace FileFlow.Models { public class AppSettings { public string DefaultSourceFolder { get; set; } = ""; public string DefaultTargetFolder { get; set; } = ""; public bool StartMinimized { get; set; } = false; public bool ShowTrayIcon { get; set; } = true; } }
