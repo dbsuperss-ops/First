@@ -1,3 +1,0 @@
-using System;
-using System.Collections.Generic;
-namespace FileFlow.Models { public class ClassifyRecord { public DateTime ExecutedAt { get; set; } public string ScenarioName { get; set; } = ""; public string SourceFolder { get; set; } = ""; public string TargetFolder { get; set; } = ""; public int FileCount { get; set; } public long TotalBytes { get; set; } public List<FileMove> Files { get; set; } = new(); } public class FileMove { public string OriginalPath { get; set; } = ""; public string NewPath { get; set; } = ""; public string FileName { get; set; } = ""; public string RuleName { get; set; } = ""; } }
