@@ -299,8 +299,8 @@
                         <ItemsControl x:Name="_messageList" Padding="0,10,0,20">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:MessageViewModel}">
-                                    <Grid Margin="20,8,20,0">
-                                        <Grid.ContextMenu>
+                                    <StackPanel Margin="20,8,20,0">
+                                        <StackPanel.ContextMenu>
                                             <ContextMenu>
                                                 <MenuItem Header="📋  복사"
                                                           Click="CopyMessage_Click"/>
@@ -309,48 +309,39 @@
                                                           Foreground="#EF4444"
                                                           Click="DeleteMessage_Click"/>
                                             </ContextMenu>
-                                        </Grid.ContextMenu>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="42"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
+                                        </StackPanel.ContextMenu>
 
-                                        <Border Grid.Column="0"
-                                                Width="34" Height="34" CornerRadius="17"
-                                                Background="{Binding AvatarBrush}"
-                                                VerticalAlignment="Top">
-                                            <TextBlock Text="{Binding AvatarInitial}"
-                                                       Foreground="White"
-                                                       FontSize="12" FontWeight="Bold"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"/>
-                                        </Border>
-
-                                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <!-- 타임스탬프 + 발신자 배지 -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <TextBlock Text="{Binding TimestampText}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource TextMuted}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,8,0"/>
+                                            <Border Background="{Binding AvatarBrush}"
+                                                    CornerRadius="4"
+                                                    Padding="6,2"
+                                                    VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Sender}"
-                                                           FontWeight="SemiBold" FontSize="13"
-                                                           Foreground="{StaticResource TextPrimary}"/>
-                                                <TextBlock Text="{Binding TimestampText}"
-                                                           FontSize="11"
-                                                           Foreground="{StaticResource TextMuted}"
-                                                           Margin="8,0,0,0"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <Border CornerRadius="4,12,12,12"
-                                                    Padding="12,9"
-                                                    Background="{Binding CardBackground}"
-                                                    BorderBrush="{Binding CardBorderBrush}"
-                                                    BorderThickness="1"
-                                                    MaxWidth="540"
-                                                    HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding Content}"
-                                                           TextWrapping="Wrap"
-                                                           FontSize="13" LineHeight="21"
-                                                           Foreground="#374151"/>
+                                                           Foreground="White"
+                                                           FontSize="10" FontWeight="Bold"/>
                                             </Border>
                                         </StackPanel>
-                                    </Grid>
+
+                                        <!-- 메시지 말풍선 -->
+                                        <Border CornerRadius="4,12,12,12"
+                                                Padding="12,9"
+                                                Background="{Binding CardBackground}"
+                                                BorderBrush="{Binding CardBorderBrush}"
+                                                BorderThickness="1"
+                                                MaxWidth="600"
+                                                HorizontalAlignment="Left">
+                                            <TextBlock Text="{Binding Content}"
+                                                       TextWrapping="Wrap"
+                                                       FontSize="13" LineHeight="21"
+                                                       Foreground="#374151"/>
+                                        </Border>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
