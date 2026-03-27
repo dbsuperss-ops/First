@@ -130,35 +130,27 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
         };
 
-        var modeBadge = new Border
+        // 엔진/모델 식별자 (우측 상단 회색 텍스트)
+        var engineLabel = new TextBlock
         {
-            CornerRadius      = new CornerRadius(4),
-            Padding           = new Thickness(5, 1, 5, 1),
-            Margin            = new Thickness(6, 0, 0, 0),
+            Text              = !string.IsNullOrWhiteSpace(model.ModelId) ? model.ModelId : model.Mode.ToString(),
+            FontSize          = 11,
+            Foreground        = HexBrush("#94A3B8"),
             VerticalAlignment = VerticalAlignment.Center,
-            Background = model.Mode switch
-            {
-                AiMode.Api     => new SolidColorBrush(Color.FromRgb(0xD1, 0xFA, 0xE5)),
-                AiMode.Browser => new SolidColorBrush(Color.FromRgb(0xDB, 0xEA, 0xFE)),
-                _              => new SolidColorBrush(Color.FromRgb(0xF3, 0xF4, 0xF6)),
-            },
-            Child = new TextBlock
-            {
-                Text     = model.Mode.ToString(),
-                FontSize = 9,
-                Foreground = model.Mode switch
-                {
-                    AiMode.Api     => new SolidColorBrush(Color.FromRgb(0x06, 0x5F, 0x46)),
-                    AiMode.Browser => new SolidColorBrush(Color.FromRgb(0x1D, 0x4E, 0xD8)),
-                    _              => new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)),
-                },
-            },
+            HorizontalAlignment = HorizontalAlignment.Right,
         };
 
-        var header = new StackPanel { Orientation = Orientation.Horizontal };
-        header.Children.Add(dot);
-        header.Children.Add(nameText);
-        header.Children.Add(modeBadge);
+        var leftStack = new StackPanel { Orientation = Orientation.Horizontal };
+        leftStack.Children.Add(dot);
+        leftStack.Children.Add(nameText);
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(leftStack, 0);
+        Grid.SetColumn(engineLabel, 1);
+        header.Children.Add(leftStack);
+        header.Children.Add(engineLabel);
 
         var divider = new Border
         {
