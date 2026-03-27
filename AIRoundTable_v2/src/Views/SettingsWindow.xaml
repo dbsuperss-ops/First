@@ -1,0 +1,208 @@
+<Window x:Class="AIRoundTable.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AI 모델 설정"
+        Width="780" Height="580"
+        MinWidth="640" MinHeight="440"
+        WindowStartupLocation="CenterOwner"
+        Background="#F9FAFB"
+        FontFamily="맑은 고딕">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ── 모델 목록 ─────────────────────────────────────────────── -->
+            <Border Grid.Column="0"
+                    Background="White"
+                    BorderBrush="#E5E7EB" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="AI 모델" FontWeight="Bold" FontSize="13"
+                               Foreground="#374151" Margin="16,14,16,10"/>
+                    <ListBox x:Name="_modelList"
+                             SelectionChanged="ModelList_SelectionChanged"
+                             BorderThickness="0" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"/>
+                </DockPanel>
+            </Border>
+
+            <!-- ── 모델 설정 패널 ──────────────────────────────────────────── -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="_editPanel" Margin="24,20,24,20" IsEnabled="False">
+
+                    <!-- 기본 정보 -->
+                    <TextBlock Text="기본 정보" FontWeight="Bold" FontSize="12"
+                               Foreground="#6B7280" Margin="0,0,0,8"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="모델 이름" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                            <TextBox x:Name="_nameBox" Height="34" Padding="8,0"
+                                     VerticalContentAlignment="Center"
+                                     BorderBrush="#E5E7EB" BorderThickness="1"
+                                     Background="White" FontSize="13"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="색상 (Hex)" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="32"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="_colorPreview"
+                                        Grid.Column="0" Width="28" Height="28"
+                                        CornerRadius="4" Margin="0,3,4,3"/>
+                                <TextBox x:Name="_colorBox"
+                                         Grid.Column="1" Height="34"
+                                         Padding="8,0" VerticalContentAlignment="Center"
+                                         BorderBrush="#E5E7EB" BorderThickness="1"
+                                         Background="White" FontSize="13"
+                                         TextChanged="ColorBox_TextChanged"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 모드 선택 -->
+                    <TextBlock Text="연동 방식" FontWeight="Bold" FontSize="12"
+                               Foreground="#6B7280" Margin="0,8,0,8"/>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <RadioButton x:Name="_modeManual"  Content="수동 (복붙)"
+                                     GroupName="mode" Margin="0,0,16,0"
+                                     Checked="Mode_Checked" Tag="Manual"/>
+                        <RadioButton x:Name="_modeApi"     Content="API 키"
+                                     GroupName="mode" Margin="0,0,16,0"
+                                     Checked="Mode_Checked" Tag="Api"/>
+                        <RadioButton x:Name="_modeBrowser" Content="브라우저 자동화"
+                                     GroupName="mode"
+                                     Checked="Mode_Checked" Tag="Browser"/>
+                    </StackPanel>
+
+                    <!-- API 설정 (Mode=Api 시 표시) -->
+                    <StackPanel x:Name="_apiPanel" Visibility="Collapsed">
+                        <TextBlock Text="API 설정" FontWeight="Bold" FontSize="12"
+                                   Foreground="#6B7280" Margin="0,0,0,8"/>
+
+                        <TextBlock Text="API 타입" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="_apiTypeBox" Height="34" Margin="0,0,0,10"
+                                  SelectionChanged="ApiType_Changed">
+                            <ComboBoxItem Content="OpenAI / DeepSeek (호환)" Tag="OpenAiCompat"/>
+                            <ComboBoxItem Content="Anthropic (Claude)"        Tag="Anthropic"/>
+                            <ComboBoxItem Content="Google Gemini"             Tag="Gemini"/>
+                        </ComboBox>
+
+                        <TextBlock Text="API 키" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <PasswordBox x:Name="_apiKeyBox" Height="34" Padding="8,0"
+                                     VerticalContentAlignment="Center"
+                                     BorderBrush="#E5E7EB" BorderThickness="1"
+                                     Background="White" FontSize="13"
+                                     Margin="0,0,0,10"/>
+
+                        <StackPanel x:Name="_endpointPanel" Visibility="Collapsed">
+                            <TextBlock Text="엔드포인트 URL" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                            <TextBox x:Name="_endpointBox" Height="34" Padding="8,0"
+                                     VerticalContentAlignment="Center"
+                                     BorderBrush="#E5E7EB" BorderThickness="1"
+                                     Background="White" FontSize="13" Margin="0,0,0,10"/>
+                        </StackPanel>
+
+                        <TextBlock Text="모델 ID" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="_modelIdBox" Height="34" Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 BorderBrush="#E5E7EB" BorderThickness="1"
+                                 Background="White" FontSize="13" Margin="0,0,0,10"/>
+                    </StackPanel>
+
+                    <!-- 브라우저 설정 (Mode=Browser 시 표시) -->
+                    <StackPanel x:Name="_browserPanel" Visibility="Collapsed">
+                        <TextBlock Text="브라우저 자동화 설정" FontWeight="Bold" FontSize="12"
+                                   Foreground="#6B7280" Margin="0,0,0,8"/>
+
+                        <Border Background="#FEF3C7" CornerRadius="6" Padding="10,8" Margin="0,0,0,12">
+                            <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#92400E">
+                                브라우저 패널에서 해당 AI 사이트에 먼저 로그인하십시오.
+                                이후 질문 전송 시 자동으로 입력 및 응답 추출을 수행합니다.
+                                CSS 셀렉터는 사이트 업데이트 시 변경될 수 있습니다.
+                            </TextBlock>
+                        </Border>
+
+                        <TextBlock Text="사이트 URL" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="_siteUrlBox" Height="34" Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 BorderBrush="#E5E7EB" BorderThickness="1"
+                                 Background="White" FontSize="13" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="입력창 CSS 셀렉터" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="_inputSelBox" Height="34" Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 BorderBrush="#E5E7EB" BorderThickness="1"
+                                 Background="White" FontSize="13"
+                                 FontFamily="Consolas" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="전송 버튼 CSS 셀렉터" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="_submitSelBox" Height="34" Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 BorderBrush="#E5E7EB" BorderThickness="1"
+                                 Background="White" FontSize="13"
+                                 FontFamily="Consolas" Margin="0,0,0,10"/>
+
+                        <TextBlock Text="응답 요소 CSS 셀렉터" FontSize="12" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="_responseSelBox" Height="34" Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 BorderBrush="#E5E7EB" BorderThickness="1"
+                                 Background="White" FontSize="13"
+                                 FontFamily="Consolas" Margin="0,0,0,10"/>
+                    </StackPanel>
+
+                    <!-- 활성화 여부 -->
+                    <CheckBox x:Name="_enabledCheck" Content="이 모델 활성화 (토론에 참여)"
+                              Margin="0,8,0,0" FontSize="13"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ── 하단 버튼 ──────────────────────────────────────────────────── -->
+        <Border Grid.Row="1"
+                Background="White" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0"
+                Padding="16,12">
+            <Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                    <Button Content="+ 모델 추가" Click="AddModel_Click"
+                            Width="100" Height="34"
+                            Background="#F3F4F6" Foreground="#374151"
+                            BorderBrush="#E5E7EB" BorderThickness="1"
+                            Cursor="Hand" Margin="0,0,8,0"/>
+                    <Button Content="삭제" Click="DeleteModel_Click"
+                            Width="60" Height="34"
+                            Background="White" Foreground="#EF4444"
+                            BorderBrush="#FCA5A5" BorderThickness="1"
+                            Cursor="Hand"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="취소" Click="Cancel_Click"
+                            Width="80" Height="34"
+                            Background="White" Foreground="#6B7280"
+                            BorderBrush="#E5E7EB" BorderThickness="1"
+                            Cursor="Hand" Margin="0,0,8,0"/>
+                    <Button Content="저장" Click="Save_Click"
+                            Width="80" Height="34"
+                            Background="#7C3AED" Foreground="White"
+                            BorderThickness="0" Cursor="Hand"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

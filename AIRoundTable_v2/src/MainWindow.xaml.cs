@@ -5,6 +5,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using AIRoundTable.Models;
+using AIRoundTable.Services;
+using AIRoundTable.Views;
+using Microsoft.Web.WebView2.Wpf;
 
 namespace AIRoundTable;
 
@@ -16,33 +19,30 @@ public partial class MainWindow : Window
     private Session? _currentSession;
     private string   _activeSender = "나";
 
-    // ── 발언자 버튼 상태 테이블 ─────────────────────────────────────────────
-    private record SenderStyle(
-        Border    Btn, TextBlock Lbl,
-        string    ActiveBg,   string ActiveFg,
-        string    InactiveBg, string InactiveFg);
+    // ── 설정 & AI ──────────────────────────────────────────────────────────
+    private AppSettings _settings;
+    private readonly Dictionary<string, WebView2> _webViews = new();
 
-    private IReadOnlyList<SenderStyle> _senderStyles = null!;
+    // ── 동적 발언자 버튼 ─────────────────────────────────────────────────────
+    private readonly Dictionary<string, (Border Btn, TextBlock Lbl, string Color)> _dynamicBtns = new();
 
     // ──────────────────────────────────────────────────────────────────────
 
     public MainWindow()
     {
         InitializeComponent();
-        _senderStyles = BuildSenderStyles();
+        _settings = AppSettings.Load();
 
         _sessionListBox.ItemsSource = _sessions;
         _messageList.ItemsSource    = _messages;
 
-        UpdateSenderButtonStates();
+        RebuildUiFromSettings();
         SetActiveTab(showConversation: true);
-
         LoadSampleData();
 
         if (_sessions.Count > 0)
             _sessionListBox.SelectedIndex = 0;
 
-        // Ctrl+S 전역 단축키
         KeyDown += (_, e) =>
         {
             if (e.Key == Key.S && Keyboard.Modifiers == ModifierKeys.Control)
@@ -50,39 +50,169 @@ public partial class MainWindow : Window
         };
     }
 
-    // ── 샘플 데이터 ────────────────────────────────────────────────────────
-    private void LoadSampleData()
+    // ── 설정 기반 UI 재구성 ─────────────────────────────────────────────────
+    private void RebuildUiFromSettings()
     {
-        var s1 = new Session
+        MessageViewModel.RegisterColors(_settings.Models);
+
+        // 동적 발언자 버튼
+        _dynamicSenderButtons.Children.Clear();
+        _dynamicBtns.Clear();
+        foreach (var model in _settings.Models.Where(m => m.Enabled))
         {
-            Name        = "전략 아이디어 원탁",
-            Description = "AI 모델 간 아이디어 브레인스토밍",
+            var (btn, lbl) = CreateDynamicSenderButton(model);
+            _dynamicSenderButtons.Children.Add(btn);
+            _dynamicBtns[model.Name] = (btn, lbl, model.Color);
+        }
+
+        // 참가자 카드
+        _participantCards.Children.Clear();
+        foreach (var model in _settings.Models.Where(m => m.Enabled))
+            _participantCards.Children.Add(BuildParticipantCard(model));
+
+        // WebView2 재구성
+        foreach (var wv in _webViews.Values) wv.Dispose();
+        _webViews.Clear();
+        _browserTabControl.Items.Clear();
+
+        var browserModels = _settings.Models
+            .Where(m => m.Enabled && m.Mode == AiMode.Browser).ToList();
+
+        foreach (var model in browserModels)
+        {
+            var wv  = new WebView2 { HorizontalAlignment = HorizontalAlignment.Stretch };
+            var tab = new TabItem  { Header = model.Name, Content = wv };
+            _browserTabControl.Items.Add(tab);
+            _webViews[model.Name] = wv;
+
+            if (!string.IsNullOrWhiteSpace(model.SiteUrl))
+            {
+                var url = model.SiteUrl;
+                wv.Loaded += async (_, _) =>
+                {
+                    await wv.EnsureCoreWebView2Async();
+                    wv.Source = new Uri(url);
+                };
+            }
+        }
+
+        _browserExpander.Visibility = browserModels.Count > 0
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_activeSender != "나" && !_dynamicBtns.ContainsKey(_activeSender))
+            _activeSender = "나";
+
+        UpdateAllSenderButtonStates();
+    }
+
+    private (Border Btn, TextBlock Lbl) CreateDynamicSenderButton(AiModelConfig model)
+    {
+        Color c;
+        try { c = (Color)ColorConverter.ConvertFromString(model.Color); }
+        catch { c = (Color)ColorConverter.ConvertFromString("#6B7280"); }
+
+        var lbl = new TextBlock
+        {
+            Text = model.Name.Length > 0 ? model.Name[0].ToString() : "?",
+            Foreground          = HexBrush("#6B7280"),
+            FontWeight          = FontWeights.Bold,
+            FontSize            = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment   = VerticalAlignment.Center,
         };
-        AddSampleMessage(s1, "나",     "오늘 논의할 주제는 비용 절감형 AI 활용입니다.",                  -3);
-        AddSampleMessage(s1, "제미나이", "API 비용 없이 복사/붙여넣기 워크플로가 합리적입니다.",           -2);
-        AddSampleMessage(s1, "코파일럿", "UI 통합으로 맥락 유지가 중요합니다.",                           -1);
-        AddSampleMessage(s1, "클로드",   "타임스탬프와 화자 태깅이 핵심입니다.",                           0);
 
-        var s2 = new Session { Name = "기술 검토 회의",   Description = "기술 스택 및 아키텍처 검토" };
-        var s3 = new Session { Name = "요약 정리",        Description = "회의 내용 요약 및 액션 아이템" };
-
-        _sessions.Add(s1);
-        _sessions.Add(s2);
-        _sessions.Add(s3);
-    }
-
-    private static void AddSampleMessage(Session s, string sender, string text, int minuteOffset)
-    {
-        var baseTime = new DateTime(2026, 3, 23, 10, 1, 0);
-        s.Messages.Add(new Message
+        var btn = new Border
         {
-            Sender    = sender,
-            Content   = text,
-            Timestamp = baseTime.AddMinutes(minuteOffset + 1),
-        });
+            Width        = 36, Height = 36,
+            CornerRadius = new CornerRadius(18),
+            Background   = new SolidColorBrush(Color.FromArgb(40, c.R, c.G, c.B)),
+            Cursor       = Cursors.Hand,
+            Margin       = new Thickness(0, 0, 8, 0),
+            Tag          = model.Name,
+            Child        = lbl,
+        };
+        btn.MouseDown += SenderBtn_Click;
+
+        return (btn, lbl);
     }
 
-    // ── 탭 전환 ────────────────────────────────────────────────────────────
+    private Border BuildParticipantCard(AiModelConfig model)
+    {
+        Color c;
+        try { c = (Color)ColorConverter.ConvertFromString(model.Color); }
+        catch { c = (Color)ColorConverter.ConvertFromString("#6B7280"); }
+
+        var avatar = new Border
+        {
+            Width = 48, Height = 48, CornerRadius = new CornerRadius(24),
+            Background          = new SolidColorBrush(c),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 8),
+            Child  = new TextBlock
+            {
+                Text       = model.Name.Length > 0 ? model.Name[0].ToString() : "?",
+                Foreground = Brushes.White,
+                FontWeight = FontWeights.Bold, FontSize = 18,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment   = VerticalAlignment.Center,
+            },
+        };
+
+        var modeBadge = new Border
+        {
+            CornerRadius        = new CornerRadius(10),
+            Padding             = new Thickness(8, 2, 8, 2),
+            Margin              = new Thickness(0, 4, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Background = model.Mode switch
+            {
+                AiMode.Api     => new SolidColorBrush(Color.FromRgb(0xD1, 0xFA, 0xE5)),
+                AiMode.Browser => new SolidColorBrush(Color.FromRgb(0xDB, 0xEA, 0xFE)),
+                _              => new SolidColorBrush(Color.FromRgb(0xF3, 0xF4, 0xF6)),
+            },
+            Child = new TextBlock
+            {
+                Text     = model.Mode.ToString(),
+                FontSize = 11,
+                Foreground = model.Mode switch
+                {
+                    AiMode.Api     => new SolidColorBrush(Color.FromRgb(0x06, 0x5F, 0x46)),
+                    AiMode.Browser => new SolidColorBrush(Color.FromRgb(0x1D, 0x4E, 0xD8)),
+                    _              => new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80)),
+                },
+            },
+        };
+
+        var content = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
+        content.Children.Add(avatar);
+        content.Children.Add(new TextBlock
+        {
+            Text                = model.Name,
+            FontWeight          = FontWeights.SemiBold, FontSize = 13,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        });
+        content.Children.Add(modeBadge);
+
+        return new Border
+        {
+            Width        = 140,
+            Margin       = new Thickness(0, 0, 16, 16),
+            Background   = new SolidColorBrush(Color.FromArgb(30, c.R, c.G, c.B)),
+            CornerRadius = new CornerRadius(12),
+            Padding      = new Thickness(16, 20, 16, 20),
+            Child        = content,
+        };
+    }
+
+    // ── 설정 창 ───────────────────────────────────────────────────────────
+    private void Settings_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SettingsWindow(_settings) { Owner = this };
+        if (dlg.ShowDialog() == true)
+            RebuildUiFromSettings();
+    }
+
+    // ── 탭 전환 ───────────────────────────────────────────────────────────
     private void TabConversation_Click(object sender, RoutedEventArgs e) => SetActiveTab(true);
     private void TabParticipants_Click(object sender, RoutedEventArgs e) => SetActiveTab(false);
 
@@ -96,63 +226,45 @@ public partial class MainWindow : Window
         _tabParticipants.Style = (Style)FindResource(showConversation ? "OutlineButtonStyle"   : "ActiveTabButtonStyle");
     }
 
-    // ── 세션 선택 ──────────────────────────────────────────────────────────
+    // ── 세션 ─────────────────────────────────────────────────────────────
     private void SessionListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_sessionListBox.SelectedItem is not Session session) return;
-
-        _currentSession = session;
+        _currentSession    = session;
         _sessionTitle.Text = session.Name;
         _sessionDesc.Text  = session.Description;
-
         _messages.Clear();
         foreach (var msg in session.Messages)
             _messages.Add(new MessageViewModel(msg));
-
         ScrollToBottom();
     }
 
-    // ── 새 원탁회의 ────────────────────────────────────────────────────────
     private void NewSession_Click(object sender, RoutedEventArgs e)
     {
         string? name = ShowInputDialog("새 원탁회의", "회의 이름을 입력하시오:", "새 원탁회의");
         if (string.IsNullOrWhiteSpace(name)) return;
-
-        var session = new Session
-        {
-            Name        = name.Trim(),
-            Description = "AI 모델 간 브레인스토밍",
-        };
+        var session = new Session { Name = name.Trim(), Description = "AI 모델 간 브레인스토밍" };
         _sessions.Insert(0, session);
         _sessionListBox.SelectedItem = session;
     }
 
-    // ── 세션 컨텍스트 메뉴 ─────────────────────────────────────────────────
     private void RenameSession_Click(object sender, RoutedEventArgs e)
     {
         var session = GetContextMenuSession(sender);
         if (session is null) return;
-
         string? name = ShowInputDialog("이름 편집", "새 이름을 입력하시오:", session.Name);
         if (string.IsNullOrWhiteSpace(name)) return;
-
         session.Name = name.Trim();
-        if (_currentSession == session)
-            _sessionTitle.Text = session.Name;
+        if (_currentSession == session) _sessionTitle.Text = session.Name;
     }
 
     private void DeleteSession_Click(object sender, RoutedEventArgs e)
     {
         var session = GetContextMenuSession(sender);
         if (session is null) return;
-
-        var result = MessageBox.Show(
-            $"'{session.Name}' 세션을 삭제하시겠소?",
-            "세션 삭제",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+        var result = MessageBox.Show($"'{session.Name}' 세션을 삭제하시겠소?",
+            "세션 삭제", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         if (result != MessageBoxResult.Yes) return;
-
         if (_currentSession == session)
         {
             _currentSession    = null;
@@ -163,7 +275,7 @@ public partial class MainWindow : Window
         _sessions.Remove(session);
     }
 
-    // ── 메시지 컨텍스트 메뉴 ───────────────────────────────────────────────
+    // ── 메시지 컨텍스트 메뉴 ─────────────────────────────────────────────
     private void CopyMessage_Click(object sender, RoutedEventArgs e)
     {
         var vm = GetContextMenuMessage(sender);
@@ -179,28 +291,42 @@ public partial class MainWindow : Window
         _messages.Remove(vm);
     }
 
-    // ── 발언자 버튼 클릭 ───────────────────────────────────────────────────
+    // ── 발언자 버튼 ───────────────────────────────────────────────────────
     private void SenderBtn_Click(object sender, MouseButtonEventArgs e)
     {
-        if (sender is Border { Tag: string senderName })
+        if (sender is Border { Tag: string name })
         {
-            _activeSender = senderName;
-            UpdateSenderButtonStates();
+            _activeSender = name;
+            UpdateAllSenderButtonStates();
         }
     }
 
-    private void UpdateSenderButtonStates()
+    private void UpdateAllSenderButtonStates()
     {
-        foreach (var s in _senderStyles)
-        {
-            bool active = s.Btn.Tag is string t && t == _activeSender;
+        bool meActive = _activeSender == "나";
+        _senderMeBtn.Background = HexBrush(meActive ? "#7C3AED" : "#F3F4F6");
+        _senderMeLbl.Foreground = HexBrush(meActive ? "White"   : "#6B7280");
 
-            s.Btn.Background = HexBrush(active ? s.ActiveBg : s.InactiveBg);
-            s.Lbl.Foreground = HexBrush(active ? s.ActiveFg : s.InactiveFg);
+        foreach (var (name, (btn, lbl, colorHex)) in _dynamicBtns)
+        {
+            bool active = _activeSender == name;
+            if (active)
+            {
+                btn.Background = HexBrush(colorHex);
+                lbl.Foreground = Brushes.White;
+            }
+            else
+            {
+                Color c;
+                try { c = (Color)ColorConverter.ConvertFromString(colorHex); }
+                catch { c = (Color)ColorConverter.ConvertFromString("#6B7280"); }
+                btn.Background = new SolidColorBrush(Color.FromArgb(40, c.R, c.G, c.B));
+                lbl.Foreground = HexBrush("#6B7280");
+            }
         }
     }
 
-    // ── 입력창 이벤트 ──────────────────────────────────────────────────────
+    // ── 입력 이벤트 ───────────────────────────────────────────────────────
     private void InputTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         _placeholder.Visibility = string.IsNullOrEmpty(_inputTextBox.Text)
@@ -209,18 +335,17 @@ public partial class MainWindow : Window
 
     private void InputTextBox_KeyDown(object sender, KeyEventArgs e)
     {
-        // Enter 단독: 전송 / Shift+Enter: 줄바꿈
         if (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift)
         {
             e.Handled = true;
-            AddMessage();
+            _ = AddMessageAsync();
         }
     }
 
-    private void Send_Click(object sender, RoutedEventArgs e) => AddMessage();
+    private void Send_Click(object sender, RoutedEventArgs e) => _ = AddMessageAsync();
 
-    // ── 메시지 추가 ────────────────────────────────────────────────────────
-    private void AddMessage()
+    // ── 메시지 추가 & AI 디스패치 ─────────────────────────────────────────
+    private async Task AddMessageAsync()
     {
         if (_currentSession is null)
         {
@@ -234,13 +359,63 @@ public partial class MainWindow : Window
         var msg = new Message { Sender = _activeSender, Content = text };
         _currentSession.Messages.Add(msg);
         _messages.Add(new MessageViewModel(msg));
-
         _inputTextBox.Clear();
         _inputTextBox.Focus();
         ScrollToBottom();
+
+        if (_activeSender == "나")
+            await DispatchToAiModelsAsync(text);
     }
 
-    // ── 저장 ──────────────────────────────────────────────────────────────
+    private async Task DispatchToAiModelsAsync(string prompt)
+    {
+        var autoModels = _settings.Models
+            .Where(m => m.Enabled && m.Mode != AiMode.Manual)
+            .ToList();
+
+        if (autoModels.Count == 0) return;
+
+        SetThinking(true, $"⏳  {autoModels.Count}개 AI 모델 응답 대기 중...");
+        _sendBtn.IsEnabled = false;
+
+        await Task.WhenAll(autoModels.Select(m => AskModelAsync(m, prompt)));
+
+        SetThinking(false);
+        _sendBtn.IsEnabled = true;
+    }
+
+    private async Task AskModelAsync(AiModelConfig model, string prompt)
+    {
+        var service = AiServiceFactory.Create(model, _webViews);
+        if (service is null) return;
+
+        string responseText;
+        try
+        {
+            responseText = await service.AskAsync(prompt);
+        }
+        catch (Exception ex)
+        {
+            responseText = $"[오류] {ex.Message}";
+        }
+
+        Dispatcher.Invoke(() =>
+        {
+            if (_currentSession is null) return;
+            var reply = new Message { Sender = model.Name, Content = responseText };
+            _currentSession.Messages.Add(reply);
+            _messages.Add(new MessageViewModel(reply));
+            ScrollToBottom();
+        });
+    }
+
+    private void SetThinking(bool show, string? text = null)
+    {
+        _thinkingBar.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (text is not null) _thinkingText.Text = text;
+    }
+
+    // ── 저장 ─────────────────────────────────────────────────────────────
     private void SaveLog()
     {
         if (_currentSession is null || _currentSession.Messages.Count == 0)
@@ -261,18 +436,42 @@ public partial class MainWindow : Window
         sb.AppendLine($"# {_currentSession.Description}");
         sb.AppendLine($"# 저장일시: {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine();
-
-        foreach (var msg in _currentSession.Messages)
+        foreach (var m in _currentSession.Messages)
         {
-            sb.AppendLine($"[{msg.Sender}] {msg.Timestamp:yyyy-MM-dd HH:mm}");
-            sb.AppendLine(msg.Content);
+            sb.AppendLine($"[{m.Sender}] {m.Timestamp:yyyy-MM-dd HH:mm}");
+            sb.AppendLine(m.Content);
             sb.AppendLine();
         }
         System.IO.File.WriteAllText(dlg.FileName, sb.ToString(), System.Text.Encoding.UTF8);
         MessageBox.Show($"저장 완료:\n{dlg.FileName}", "저장", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    // ── 유틸리티 ──────────────────────────────────────────────────────────
+    // ── 샘플 데이터 ───────────────────────────────────────────────────────
+    private void LoadSampleData()
+    {
+        var s1 = new Session
+        {
+            Name        = "전략 아이디어 원탁",
+            Description = "AI 모델 간 아이디어 브레인스토밍",
+        };
+
+        static void Add(Session s, string sender, string text, int offset)
+        {
+            var t = new DateTime(2026, 3, 23, 10, 1, 0).AddMinutes(offset + 1);
+            s.Messages.Add(new Message { Sender = sender, Content = text, Timestamp = t });
+        }
+
+        Add(s1, "나",      "오늘 논의할 주제는 비용 절감형 AI 활용입니다.",           -3);
+        Add(s1, "ChatGPT", "API 비용 없이 복사/붙여넣기 워크플로가 합리적입니다.",     -2);
+        Add(s1, "코파일럿", "UI 통합으로 맥락 유지가 중요합니다.",                      -1);
+        Add(s1, "클로드",   "타임스탬프와 화자 태깅이 핵심입니다.",                      0);
+
+        _sessions.Add(s1);
+        _sessions.Add(new Session { Name = "기술 검토 회의",  Description = "기술 스택 및 아키텍처 검토" });
+        _sessions.Add(new Session { Name = "요약 정리",       Description = "회의 내용 요약 및 액션 아이템" });
+    }
+
+    // ── 유틸리티 ─────────────────────────────────────────────────────────
     private void ScrollToBottom()
     {
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
@@ -286,19 +485,6 @@ public partial class MainWindow : Window
         return b;
     }
 
-    private IReadOnlyList<SenderStyle> BuildSenderStyles() => new[]
-    {
-        new SenderStyle(_senderMeBtn,      _senderMeLbl,
-                        "#7C3AED", "White",   "#F3F4F6", "#6B7280"),
-        new SenderStyle(_senderGeminiBtn,  _senderGeminiLbl,
-                        "#10B981", "White",   "#D1FAE5", "#065F46"),
-        new SenderStyle(_senderCopilotBtn, _senderCopilotLbl,
-                        "#3B82F6", "White",   "#DBEAFE", "#1D4ED8"),
-        new SenderStyle(_senderClaudeBtn,  _senderClaudeLbl,
-                        "#F59E0B", "White",   "#FEF3C7", "#92400E"),
-    };
-
-    // ── 컨텍스트 메뉴 헬퍼 ────────────────────────────────────────────────
     private static Session? GetContextMenuSession(object sender)
     {
         var mi = (MenuItem)sender;
@@ -313,22 +499,21 @@ public partial class MainWindow : Window
         return (cm.PlacementTarget as FrameworkElement)?.DataContext as MessageViewModel;
     }
 
-    // ── 간단한 입력 다이얼로그 ─────────────────────────────────────────────
     private string? ShowInputDialog(string title, string prompt, string defaultValue = "")
     {
         var dlg = new Window
         {
             Title  = title, Width = 380, Height = 170,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Owner  = this,
-            ResizeMode   = ResizeMode.NoResize,
-            FontFamily   = new FontFamily("맑은 고딕"),
-            Background   = new SolidColorBrush(Colors.White),
+            Owner       = this,
+            ResizeMode  = ResizeMode.NoResize,
+            FontFamily  = new FontFamily("맑은 고딕"),
+            Background  = new SolidColorBrush(Colors.White),
         };
-        var panel = new StackPanel { Margin = new Thickness(20) };
-        var lbl   = new TextBlock  { Text = prompt, Margin = new Thickness(0, 0, 0, 8), Foreground = HexBrush("#374151") };
-        var input = new TextBox    { Text = defaultValue, Padding = new Thickness(8, 6, 8, 6),
-                                     BorderBrush = HexBrush("#E5E7EB"), BorderThickness = new Thickness(1) };
+        var panel  = new StackPanel { Margin = new Thickness(20) };
+        var lbl    = new TextBlock  { Text = prompt, Margin = new Thickness(0, 0, 0, 8), Foreground = HexBrush("#374151") };
+        var input  = new TextBox    { Text = defaultValue, Padding = new Thickness(8, 6, 8, 6),
+                                      BorderBrush = HexBrush("#E5E7EB"), BorderThickness = new Thickness(1) };
         var btnRow = new StackPanel { Orientation = Orientation.Horizontal,
                                       HorizontalAlignment = HorizontalAlignment.Right,
                                       Margin = new Thickness(0, 12, 0, 0) };
@@ -338,8 +523,8 @@ public partial class MainWindow : Window
         var cancel = new Button { Content = "취소",  Width = 76, Height = 32 };
 
         string? result = null;
-        ok.Click     += (_, _) => { result = input.Text; dlg.Close(); };
-        cancel.Click += (_, _) => dlg.Close();
+        ok.Click      += (_, _) => { result = input.Text; dlg.Close(); };
+        cancel.Click  += (_, _) => dlg.Close();
         input.KeyDown += (_, e) => { if (e.Key == Key.Enter) { result = input.Text; dlg.Close(); } };
 
         btnRow.Children.Add(ok);

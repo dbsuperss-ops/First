@@ -5,25 +5,45 @@ namespace AIRoundTable;
 
 public class MessageViewModel
 {
-    private static readonly Dictionary<string, (Brush Avatar, Brush Card, Brush Border)> Colors = new()
+    private static readonly Dictionary<string, (Brush Avatar, Brush Card, Brush Border)> _colors = new()
     {
-        ["나"]     = (Brush("#7C3AED"), Brush("#FFFFFF"), Brush("#E5E7EB")),
-        ["제미나이"] = (Brush("#10B981"), Brush("#F0FDF4"), Brush("#D1FAE5")),
-        ["코파일럿"] = (Brush("#3B82F6"), Brush("#EFF6FF"), Brush("#DBEAFE")),
-        ["클로드"]   = (Brush("#F59E0B"), Brush("#FFFBEB"), Brush("#FEF3C7")),
+        ["나"] = (HexBrush("#7C3AED"), HexBrush("#FFFFFF"), HexBrush("#E5E7EB")),
     };
 
-    private static readonly Dictionary<string, string> Initials = new()
+    /// <summary>
+    /// 설정에서 AI 모델 색상을 등록합니다. UI 재구성 시 호출하십시오.
+    /// </summary>
+    public static void RegisterColors(IEnumerable<AiModelConfig> models)
     {
-        ["나"] = "나", ["제미나이"] = "G", ["코파일럿"] = "C", ["클로드"] = "A",
-    };
+        _colors.Clear();
+        _colors["나"] = (HexBrush("#7C3AED"), HexBrush("#FFFFFF"), HexBrush("#E5E7EB"));
 
-    public Message Source        { get; }
-    public string  Sender        { get; }
-    public string  Content       { get; }
-    public string  TimestampText { get; }
-    public string  AvatarInitial { get; }
-    public Brush   AvatarBrush   { get; }
+        foreach (var m in models)
+        {
+            try
+            {
+                var c      = (Color)ColorConverter.ConvertFromString(m.Color);
+                var light  = Color.FromArgb(30, c.R, c.G, c.B);
+                var border = Color.FromArgb(80, c.R, c.G, c.B);
+                _colors[m.Name] = (
+                    Freeze(new SolidColorBrush(c)),
+                    Freeze(new SolidColorBrush(light)),
+                    Freeze(new SolidColorBrush(border))
+                );
+            }
+            catch
+            {
+                _colors[m.Name] = (HexBrush("#6B7280"), HexBrush("#FFFFFF"), HexBrush("#E5E7EB"));
+            }
+        }
+    }
+
+    public Message Source          { get; }
+    public string  Sender          { get; }
+    public string  Content         { get; }
+    public string  TimestampText   { get; }
+    public string  AvatarInitial   { get; }
+    public Brush   AvatarBrush     { get; }
     public Brush   CardBackground  { get; }
     public Brush   CardBorderBrush { get; }
 
@@ -33,10 +53,9 @@ public class MessageViewModel
         Sender        = msg.Sender;
         Content       = msg.Content;
         TimestampText = msg.Timestamp.ToString("HH:mm");
-        AvatarInitial = Initials.GetValueOrDefault(msg.Sender,
-                            msg.Sender.Length > 0 ? msg.Sender[0].ToString() : "?");
+        AvatarInitial = msg.Sender.Length > 0 ? msg.Sender[0].ToString() : "?";
 
-        if (Colors.TryGetValue(msg.Sender, out var c))
+        if (_colors.TryGetValue(msg.Sender, out var c))
         {
             AvatarBrush     = c.Avatar;
             CardBackground  = c.Card;
@@ -44,16 +63,14 @@ public class MessageViewModel
         }
         else
         {
-            AvatarBrush     = Brush("#6B7280");
-            CardBackground  = Brush("#FFFFFF");
-            CardBorderBrush = Brush("#E5E7EB");
+            AvatarBrush     = HexBrush("#6B7280");
+            CardBackground  = HexBrush("#FFFFFF");
+            CardBorderBrush = HexBrush("#E5E7EB");
         }
     }
 
-    private static SolidColorBrush Brush(string hex)
-    {
-        var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-        b.Freeze();
-        return b;
-    }
+    private static SolidColorBrush HexBrush(string hex)
+        => Freeze(new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)));
+
+    private static SolidColorBrush Freeze(SolidColorBrush b) { b.Freeze(); return b; }
 }
