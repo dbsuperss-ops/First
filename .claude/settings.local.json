@@ -12,6 +12,9 @@
       "Bash(find projects/KscRefiner/engine -maxdepth 2 ( -name \"*.py\" -o -name \"*.yaml\" -o -name \"*.yml\" -o -name \"*.json\" -o -name \"*.md\" ) ! -path \"*/build/*\" ! -path \"*/__pycache__/*\")",
       "Bash(git remote set-url origin git@github.com:dbsuperss-ops/First.git)",
       "Bash(git stash pop)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\dbsup"
     ]
   }
 }
