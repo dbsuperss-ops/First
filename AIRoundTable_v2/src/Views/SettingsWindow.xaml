@@ -165,6 +165,10 @@
                                  BorderBrush="#E5E7EB" BorderThickness="1"
                                  Background="White" FontSize="13"
                                  FontFamily="Consolas" Margin="0,0,0,10"/>
+
+                        <CheckBox x:Name="_ctrlEnterCheck"
+                                  Content="Ctrl+Enter로 전송 (클로드처럼 Enter 단독으로 전송 안 되는 경우)"
+                                  FontSize="12" Foreground="#374151" Margin="0,4,0,0"/>
                     </StackPanel>
 
                     <!-- 활성화 여부 -->

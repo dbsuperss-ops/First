@@ -18,4 +18,5 @@ public class AiModelConfig
     public string? InputSelector     { get; set; }  // 입력창 CSS 셀렉터
     public string? SubmitSelector    { get; set; }  // 전송 버튼 CSS 셀렉터
     public string? ResponseSelector  { get; set; }  // 응답 요소 CSS 셀렉터
+    public bool    UseCtrlEnter      { get; set; }  // Ctrl+Enter로 전송 (클로드 등)
 }

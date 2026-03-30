@@ -442,6 +442,7 @@ public partial class MainWindow : Window
 
         await Task.Delay(600);
 
+        var ctrlKey = model.UseCtrlEnter ? "true" : "false";
         await wv.CoreWebView2.ExecuteScriptAsync($@"
 (function() {{
     const btn = document.querySelector('{submitSel}');
@@ -450,7 +451,7 @@ public partial class MainWindow : Window
     }} else {{
         const el = document.querySelector('{inputSel}');
         el?.dispatchEvent(new KeyboardEvent('keydown', {{
-            key: 'Enter', keyCode: 13, bubbles: true
+            key: 'Enter', keyCode: 13, ctrlKey: {ctrlKey}, bubbles: true
         }}));
     }}
 }})();
@@ -580,8 +581,8 @@ public partial class MainWindow : Window
             while (slot.IsBusy && DateTime.UtcNow < waitDeadline)
                 await Task.Delay(500);
 
-            // isCrossDispatch=true 로 재귀 교차 배포 방지
-            _ = AutoInjectAndExtractAsync(slot, responseText, isCrossDispatch: true);
+            // 교차 배포: 이전 응답을 받아 계속 토론 진행
+            _ = AutoInjectAndExtractAsync(slot, responseText, isCrossDispatch: false);
         }
     }
 

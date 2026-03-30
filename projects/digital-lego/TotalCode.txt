@@ -1,0 +1,3471 @@
+
+
+=======================================================
+File: electron\main.cjs
+=======================================================
+
+'use strict'
+
+const { app, BrowserWindow, ipcMain } = require('electron')
+const path = require('path')
+const https = require('https')
+const fs = require('fs')
+
+const isDev = process.env.NODE_ENV === 'development'
+
+const SYSTEM_PROMPT =
+  '당신은 경신 회사의 업무 브릭 생성 도우미입니다. 사용자 요청을 분석해 JSON으로만 응답하시오: {"name":"...","description":"...","category":"재무|인사|대시보드|구매|품질","tags":["..."],"message":"..."}'
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      webviewTag: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+    },
+  })
+
+  if (isDev) {
+    win.loadURL('http://localhost:5173')
+    win.webContents.openDevTools()
+  } else {
+    win.loadFile(path.join(app.getAppPath(), 'dist/index.html'))
+  }
+}
+
+// ── File-based store ─────────────────────────────────────────────────────────
+
+ipcMain.handle('fs:readStore', (_e, key) => {
+  const file = path.join(app.getPath('userData'), `${key}.json`)
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('fs:writeStore', (_e, key, data) => {
+  const file = path.join(app.getPath('userData'), `${key}.json`)
+  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8')
+})
+
+// ── Multi-provider AI call ───────────────────────────────────────────────────
+
+function httpsPost(options, body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data))
+        } catch {
+          reject(new Error('응답 파싱 실패'))
+        }
+      })
+    })
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+}
+
+ipcMain.handle('ai:call', async (_event, { provider, apiKey, messages, endpoint }) => {
+  if (provider === 'claude') {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages,
+    })
+    const parsed = await httpsPost(
+      {
+        hostname: 'api.anthropic.com',
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      body
+    )
+    if (parsed.error) throw new Error(parsed.error.message || 'API error')
+    return parsed.content[0].text
+
+  } else if (provider === 'gemini') {
+    const geminiMessages = messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }))
+    const body = JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: geminiMessages,
+      generationConfig: { maxOutputTokens: 1024 },
+    })
+    const parsed = await httpsPost(
+      {
+        hostname: 'generativelanguage.googleapis.com',
+        path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      body
+    )
+    if (parsed.error) throw new Error(parsed.error.message || 'Gemini API error')
+    return parsed.candidates[0].content.parts[0].text
+
+  } else if (provider === 'chatgpt' || provider === 'copilot') {
+    const hostname = provider === 'chatgpt'
+      ? 'api.openai.com'
+      : 'models.inference.ai.azure.com'
+    const apiPath = provider === 'chatgpt'
+      ? '/v1/chat/completions'
+      : '/v1/chat/completions'
+    const model = provider === 'chatgpt' ? 'gpt-4o-mini' : 'gpt-4o'
+    const body = JSON.stringify({
+      model,
+      max_tokens: 1024,
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+    })
+    const parsed = await httpsPost(
+      {
+        hostname,
+        path: apiPath,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      body
+    )
+    if (parsed.error) throw new Error(parsed.error.message || 'OpenAI API error')
+    return parsed.choices[0].message.content
+
+  } else if (provider === 'mimo' && endpoint) {
+    const body = JSON.stringify({
+      model: 'mimo-v2-pro',
+      max_tokens: 1024,
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+    })
+    const url = new URL(endpoint)
+    const parsed = await httpsPost(
+      {
+        hostname: url.hostname,
+        path: url.pathname + (url.search || ''),
+        port: url.port || undefined,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      body
+    )
+    if (parsed.error) throw new Error(parsed.error.message || 'Mimo API error')
+    return parsed.choices[0].message.content
+
+  } else {
+    throw new Error(`지원하지 않는 AI 제공자: ${provider}`)
+  }
+})
+
+app.whenReady().then(() => {
+  createWindow()
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})
+
+
+=======================================================
+File: electron\preload.cjs
+=======================================================
+
+'use strict'
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  readStore:  (key)       => ipcRenderer.invoke('fs:readStore', key),
+  writeStore: (key, data) => ipcRenderer.invoke('fs:writeStore', key, data),
+  callAI:     (opts)      => ipcRenderer.invoke('ai:call', opts),
+})
+
+
+=======================================================
+File: eslint.config.js
+=======================================================
+
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+import { defineConfig, globalIgnores } from 'eslint/config'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      reactHooks.configs.flat.recommended,
+      reactRefresh.configs.vite,
+    ],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+  },
+])
+
+
+=======================================================
+File: gather_code.js
+=======================================================
+
+const fs = require('fs');
+const path = require('path');
+
+const projectRoot = 'C:\\Users\\dbsup\\.antigravity\\projects\\digital-lego';
+const outputFile = path.join(projectRoot, 'TotalCode.txt');
+
+const includeExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.html', '.md', '.cjs', '.mjs'];
+const excludeFolders = ['node_modules', '.git', 'dist', 'build', 'release', '.vs', '.vscode', 'coverage'];
+
+let outputBuffer = '';
+
+function walk(dir) {
+    const list = fs.readdirSync(dir);
+    for (const file of list) {
+        const filePath = path.join(dir, file);
+        const stat = fs.statSync(filePath);
+        if (stat && stat.isDirectory()) {
+            if (!excludeFolders.includes(file)) {
+                walk(filePath);
+            }
+        } else {
+            if (includeExtensions.includes(path.extname(file)) && file !== 'TotalCode.txt' && file !== 'gather_code.js' && file !== 'package-lock.json') {
+                try {
+                    const relativePath = path.relative(projectRoot, filePath);
+                    const contents = fs.readFileSync(filePath, 'utf8');
+                    outputBuffer += `\n\n=======================================================\n`;
+                    outputBuffer += `File: ${relativePath}\n`;
+                    outputBuffer += `=======================================================\n\n`;
+                    outputBuffer += contents;
+                } catch(e) {
+                    console.error("Error reading: " + filePath);
+                }
+            }
+        }
+    }
+}
+
+walk(projectRoot);
+fs.writeFileSync(outputFile, outputBuffer);
+console.log('Code aggregated into ' + outputFile);
+
+
+=======================================================
+File: index.html
+=======================================================
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>digital-lego</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+=======================================================
+File: package.json
+=======================================================
+
+{
+  "name": "digital-lego",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "electron:dev": "cross-env NODE_ENV=development concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --x64",
+    "electron:preview": "npm run build && cross-env NODE_ENV=production electron ."
+  },
+  "build": {
+    "appId": "com.digital-lego.app",
+    "productName": "Digital Lego",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/main.cjs",
+      "electron/preload.cjs"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "Digital_Lego.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.6.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.13.2",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.2",
+    "tw-animate-css": "^1.4.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^19.1.0",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.0.4",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vite": "^8.0.1",
+    "wait-on": "^9.0.4"
+  }
+}
+
+
+=======================================================
+File: README.md
+=======================================================
+
+# React + TypeScript + Vite
+
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+
+Currently, two official plugins are available:
+
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
+
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```
+# 🧱 경신 디지털 레고 (Kyungshin Digital LEGO)
+
+> **사내 업무 자동화 모듈을 레고 블록처럼 생성·저장·조립하는 내부 플랫폼**  
+> Kyungshin AI TFT — 2026.03
+
+---
+
+## 📌 목차
+
+1. [프로젝트 개요](#1-프로젝트-개요)
+2. [주요 기능](#2-주요-기능)
+3. [화면 구성](#3-화면-구성)
+4. [사용 프로세스](#4-사용-프로세스)
+5. [브릭 개념 정의](#5-브릭-개념-정의)
+6. [기술 스택](#6-기술-스택)
+7. [프로젝트 구조](#7-프로젝트-구조)
+8. [환경 설정](#8-환경-설정)
+9. [실행 방법](#9-실행-방법)
+10. [디자인 시스템](#10-디자인-시스템)
+11. [추진 계획](#11-추진-계획)
+
+---
+
+## 1. 프로젝트 개요
+
+### 배경
+
+사내 업무 자동화 산출물(Excel 리포트, Power BI 대시보드, Python 스크립트, PPTX 보고서 등)이 부서별로 분산 관리되고 있으며, 동일·유사한 작업이 중복 개발되는 비효율이 반복되고 있다.
+
+### 목표
+
+| # | 목표 |
+|---|------|
+| 1 | 업무 자동화 모듈의 사내 표준화 및 재사용성 확보 |
+| 2 | 부서 간 산출물 공유 체계 구축으로 중복 개발 비용 절감 |
+| 3 | AI 코파일럿 연동을 통한 모듈 생성 지원 및 조합 추천 |
+| 4 | KSC Settlement Refiner 등 기존 자동화 자산의 플랫폼 통합 기반 마련 |
+
+### 기대 효과
+
+| 구분 | 현재 | 도입 후 |
+|------|------|---------|
+| 모듈 관리 | 부서별 분산, OneDrive/로컬 혼재 | 중앙 창고에서 통합 검색·사용 |
+| 재사용성 | 구전(口傳)·개인 공유 의존 | 태그·카테고리 기반 즉시 탐색 |
+| 신규 개발 | 처음부터 개발, 레퍼런스 부재 | AI 코파일럿으로 기존 브릭 조합·생성 |
+| 품질 관리 | 개인 역량 의존, 검증 프로세스 없음 | 별점·상태(Published/Draft) 기반 관리 |
+
+---
+
+## 2. 주요 기능
+
+### ① 브릭 생성 — AI 코파일럿
+
+자연어로 업무 기능을 설명하면 AI 코파일럿이 브릭 설명·태그·기능 목록 초안을 자동 생성한다.  
+사용자는 생성된 초안을 확인·수정 후 `Draft` 또는 `Published` 상태로 등록한다.
+
+### ② 모듈 창고 — 검색 및 탐색
+
+등록된 모든 브릭을 카테고리 필터, 브릭 유형 필터(단일/복합), 텍스트 검색, 별점으로 탐색한다.  
+Grid / List 뷰 전환을 지원한다.
+
+### ③ 브릭 조립 — 복합 시스템 구성
+
+단일 브릭을 조립 캔버스에 배치하고 이름·설명을 부여하면 복합 브릭(조립 시스템)이 생성된다.  
+비개발 직군도 활용 가능한 드래그 앤드 드롭 인터랙션을 지향한다.
+
+### ④ 나의 브릭 — 개인 자산 관리
+
+내가 생성한 단일 브릭과 조립한 복합 브릭을 한 곳에서 관리한다.  
+수정·삭제·상태 변경이 가능하며, 전체/발행됨/초안/조립 시스템별 통계를 제공한다.
+
+### ⑤ 대시보드 — 현황 한눈에 파악
+
+최근 인기 브릭, 가장 많이 조립된 복합 시스템, Quick Stats(전체 브릭 수·발행 수·카테고리 수)를 메인 화면에서 즉시 확인한다.
+
+---
+
+## 3. 화면 구성
+
+| # | 화면명 | 경로 | 주요 역할 |
+|---|--------|------|-----------|
+| 1 | 대시보드 | `/` | 전체 현황 요약, 인기 브릭·복합 시스템 목록, Quick Stats |
+| 2 | 브릭 생성 | `/create` | AI 코파일럿 연동 브릭 생성, 카테고리·태그·상태 설정 |
+| 3 | 모듈 창고 | `/storage` | 전체 브릭 검색·필터·탐색, Grid/List 뷰 전환 |
+| 4 | 브릭 조립 | `/assemble` | 단일 브릭 조합 → 복합 브릭(조립 시스템) 생성 |
+| 5 | 나의 브릭 | `/my-bricks` | 내 브릭 목록 관리, 수정·삭제·발행 상태 변경 |
+
+---
+
+## 4. 사용 프로세스
+
+```
+① 생성  →  ② 저장  →  ③ 조합  →  ④ 공유  →  ⑤ 재활용
+```
+
+| 단계 | 화면 | 주요 행동 | 결과 |
+|------|------|-----------|------|
+| ① 생성 | `/create` | AI 코파일럿에 업무 내용 입력 → 초안 확인 → 카테고리·태그·상태 설정 | 단일 브릭 등록 |
+| ② 저장 | `/storage` | 등록된 브릭 검색·탐색, 별점 확인 | 사용할 브릭 선정 |
+| ③ 조합 | `/assemble` | 조립 캔버스에 브릭 2개 이상 추가 → 이름·설명 입력 → 저장 | 복합 브릭 생성 |
+| ④ 공유 | `/my-bricks` | 브릭 관리, Published 상태로 변경 | 전체 구성원 공유 |
+| ⑤ 재활용 | 대시보드 + 창고 | 다른 구성원이 공개 브릭을 조립에 재활용 | 지식 자산 누적 |
+
+### 브릭 생성 상세 흐름
+
+1. `/create` 진입 → AI 코파일럿 채팅창에 업무 내용 입력
+2. AI가 브릭 이름·설명·예상 기능 목록 초안 자동 생성
+3. 우측 패널에서 카테고리 / 브릭 유형 / 태그 / 상태 선택
+4. **브릭 생성** 버튼 클릭 → 저장 완료 → 모듈 창고 자동 반영
+
+### 브릭 조립 상세 흐름
+
+1. 좌측 패널: 등록된 단일 브릭 목록 표시
+2. 원하는 브릭 클릭 → 중앙 조립 캔버스에 순서대로 추가 (최소 2개)
+3. 각 브릭은 색상 보더와 연결선으로 시각화, 순서 확인 가능
+4. 우측 패널: 조립 이름·설명 입력 후 **조립 저장** 클릭
+5. 복합 브릭 생성 완료 → 나의 브릭 및 대시보드 반영
+
+---
+
+## 5. 브릭 개념 정의
+
+**브릭(Brick)** 은 하나의 업무 자동화 단위 모듈을 지칭하는 플랫폼 내 표준 용어다.  
+레고 블록처럼 독립적으로 사용할 수 있으며, 다른 브릭과 조합하여 더 복잡한 업무 시스템을 구성할 수 있다.
+
+### 브릭 유형
+
+| 유형 | 대상 | 예시 |
+|------|------|------|
+| **단일 브릭** | 단일 기능 모듈 | 해외법인 결산 파서, 부서별 KPI 추출 스크립트 |
+| **복합 브릭** | 2개 이상 브릭 조합 | KSC Settlement Refiner (파서 + DB + PPTX 생성) |
+
+### 카테고리 체계
+
+| 카테고리 | 색상 | 주요 대상 업무 |
+|----------|------|----------------|
+| 재무 (Finance) | 🔵 블루 | 결산, 예산, 법인 실적 통합 |
+| 인사 (HR) | 🟢 그린 | 근태, 급여, 인원 현황 |
+| 대시보드 | 🟠 오렌지 | 경영진 리포트, KPI 시각화 |
+| 구매 (Purchase) | 🟣 퍼플 | 발주, 협력사 관리, 단가 분석 |
+| 품질 (Quality) | 🔴 레드 | 불량률, 공정 품질 데이터 처리 |
+
+### 브릭 데이터 스키마 (예시)
+
+```json
+{
+  "id": "brick-001",
+  "name": "해외법인 결산 파서",
+  "description": "KCTR/KSCCZ/KSCE/KSCI/KSCP 결산 Excel 자동 파싱 모듈",
+  "category": "finance",
+  "type": "single",
+  "tags": ["Finance", "Excel", "Parser"],
+  "status": "published",
+  "rating": 4.5,
+  "author": "고태호",
+  "createdAt": "2026-03-01T09:00:00Z",
+  "updatedAt": "2026-03-15T14:30:00Z"
+}
+```
+
+---
+
+## 6. 기술 스택
+
+| 구분 | 기술 | 비고 |
+|------|------|------|
+| 프레임워크 | React + TypeScript | TanStack Router 기반 SPA |
+| 스타일 | Tailwind CSS v4 + shadcn/ui | OKLCH 색상 토큰 사용 |
+| AI 연동 | Google Gemini / Azure OpenAI | 브릭 생성 코파일럿 |
+| 아이콘 | Lucide React | Box, Puzzle, Sparkles 등 |
+| 애니메이션 | tw-animate-css + Custom CSS | brick-pop, float 효과 |
+
+---
+
+## 7. 프로젝트 구조
+
+```
+src/
+├── pages/
+│   ├── _layout.tsx        # 메인 레이아웃 (사이드바 + 헤더)
+│   ├── index.tsx          # 대시보드
+│   ├── create.tsx         # 브릭 생성 (AI 코파일럿)
+│   ├── storage.tsx        # 모듈 창고
+│   ├── assemble.tsx       # 브릭 조립
+│   ├── my-bricks.tsx      # 나의 브릭
+│   └── not-found.tsx      # 404
+├── components/
+│   ├── ui/                # shadcn/ui 기본 컴포넌트
+│   ├── BrickCard.tsx      # 브릭 카드 공통 컴포넌트
+│   └── AssemblyCard.tsx   # 조립 카드 공통 컴포넌트
+├── lib/
+│   └── utils.ts           # cn() 유틸리티
+└── index.css              # 테마 / 디자인 토큰
+```
+
+---
+
+## 8. 환경 설정
+
+프로젝트 루트에 `.env` 파일을 생성하고 아래 값을 설정한다.
+
+```env
+# AI 코파일럿 — Gemini 또는 Azure OpenAI 중 사용하는 쪽만 설정
+VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+VITE_AZURE_OPENAI_API_KEY=your_azure_api_key
+VITE_AZURE_OPENAI_DEPLOYMENT=your_deployment_name
+```
+
+> ⚠️ `.env` 파일은 절대 Git에 커밋하지 않는다. `.gitignore`에 등록 필수.
+
+---
+
+## 9. 실행 방법
+
+```bash
+# 의존성 설치
+npm install
+
+# 개발 서버 실행
+npm run dev
+
+# 빌드
+npm run build
+
+# 빌드 결과 미리보기
+npm run preview
+```
+
+---
+
+## 10. 디자인 시스템
+
+### 색상 토큰
+
+| 토큰 | 값 (OKLCH) | 용도 |
+|------|-----------|------|
+| `--primary` | `oklch(0.50 0.18 250)` | 경신 블루 — 주요 액션 |
+| `--accent` | `oklch(0.70 0.18 155)` | 경신 그린 — 강조 |
+| `--background` | `oklch(0.98 0.005 240)` | 페이지 배경 |
+| `--sidebar` | `oklch(0.25 0.05 250)` | 사이드바 배경 (다크) |
+
+### 브릭 색상 클래스
+
+```css
+.brick-blue   { background: oklch(0.55 0.20 250); } /* 재무 */
+.brick-green  { background: oklch(0.65 0.20 155); } /* 인사 */
+.brick-orange { background: oklch(0.70 0.18 45);  } /* 대시보드 */
+.brick-purple { background: oklch(0.60 0.22 320); } /* 구매 */
+.brick-red    { background: oklch(0.65 0.20 25);  } /* 품질 */
+```
+
+### 커스텀 애니메이션
+
+| 클래스 | 효과 |
+|--------|------|
+| `.animate-float` | 부유 효과 (3초 주기) |
+| `.animate-brick-pop` | 브릭 등장 효과 (0.3초) |
+
+### 모션 토큰
+
+```css
+--dur-fast:   120ms;
+--dur-medium: 200ms;
+--dur-slow:   360ms;
+```
+
+---
+
+## 11. 추진 계획
+
+| Phase | 기간 (안) | 주요 내용 | 산출물 |
+|-------|-----------|-----------|--------|
+| Phase 1 | 2026. 4월 | 브릭 데이터 스키마 확정, 백엔드 API 설계, 프론트 기본 레이아웃 구현 | DB 스키마 문서, 레이아웃 프로토타입 |
+| Phase 2 | 2026. 5월 | 브릭 생성·창고·나의 브릭 화면 구현, AI 코파일럿 연동 | 단일 브릭 CRUD 완성 |
+| Phase 3 | 2026. 6월 | 조립 기능 구현, 복합 브릭 생성·관리, 대시보드 완성 | 복합 브릭 조립 시스템 완성 |
+| Phase 4 | 2026. 7월~ | KSC Settlement Refiner 등 기존 자산 브릭 등록, 사내 파일럿 운영 | 파일럿 운영 보고서 |
+
+---
+
+> 경신 디지털 레고는 단순 도구 도입이 아니라, 사내 업무 자동화 자산을 조직 공유 지식으로 전환하는 플랫폼이다.  
+> TFT 주도로 파일럿을 진행하며 점진적으로 확산하는 방향을 권고한다.
+
+---
+
+*경신 사내 AI 활용 TFT · 2026.03*
+
+
+
+=======================================================
+File: src\components\AssemblyCard.tsx
+=======================================================
+
+import { Puzzle } from "lucide-react"
+import type { Assembly } from "@/types"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+
+interface AssemblyCardProps {
+  assembly: Assembly
+  className?: string
+  onClick?: () => void
+}
+
+export function AssemblyCard({ assembly, className, onClick }: AssemblyCardProps) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden animate-brick-pop transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+        onClick && "cursor-pointer",
+        className
+      )}
+      onClick={onClick}
+    >
+      {/* Header bar */}
+      <div className="h-2 w-full bg-gradient-to-r from-violet-500 to-pink-400 lego-pattern" />
+
+      <div className="p-4">
+        {/* Icon + Title */}
+        <div className="flex items-start gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-pink-400 shrink-0">
+            <Puzzle className="h-4 w-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm leading-tight line-clamp-1">{assembly.name}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{assembly.author}</p>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{assembly.description}</p>
+
+        {/* Bricks count */}
+        <div className="flex items-center gap-1.5 mb-3">
+          <span className="text-xs text-muted-foreground">브릭 {assembly.bricks.length}개</span>
+          <div className="flex gap-1">
+            {assembly.bricks.slice(0, 3).map((brick) => (
+              <span
+                key={brick.id}
+                className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-xs"
+              >
+                {brick.name.length > 8 ? brick.name.slice(0, 8) + "…" : brick.name}
+              </span>
+            ))}
+            {assembly.bricks.length > 3 && (
+              <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-xs">
+                +{assembly.bricks.length - 3}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Footer: Badges + Status */}
+        <div className="flex items-center justify-between">
+          <Badge className="bg-violet-100 text-violet-700 border-0 text-xs">복합 시스템</Badge>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
+              assembly.status === "Published"
+                ? "bg-green-100 text-green-700"
+                : "bg-yellow-100 text-yellow-700"
+            )}
+          >
+            {assembly.status === "Published" ? "발행됨" : "초안"}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\components\BrickCard.tsx
+=======================================================
+
+import { useState } from "react"
+import { Box, Star } from "lucide-react"
+import type { Brick } from "@/types"
+import { CATEGORY_COLORS, CATEGORY_BADGE_COLORS } from "@/lib/store"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+
+interface BrickCardProps {
+  brick: Brick
+  className?: string
+  onClick?: () => void
+  onRate?: (rating: number) => void
+}
+
+export function BrickCard({ brick, className, onClick, onRate }: BrickCardProps) {
+  const gradientClass = CATEGORY_COLORS[brick.category] ?? "from-gray-500 to-gray-400"
+  const badgeClass = CATEGORY_BADGE_COLORS[brick.category] ?? "bg-gray-100 text-gray-700"
+  const [hoverRating, setHoverRating] = useState(0)
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden animate-brick-pop transition-all duration-200 hover:shadow-md hover:-translate-y-0.5",
+        onClick && "cursor-pointer",
+        className
+      )}
+      onClick={onClick}
+    >
+      {/* Header bar */}
+      <div className={cn("h-2 w-full bg-gradient-to-r lego-pattern", gradientClass)} />
+
+      <div className="p-4">
+        {/* Icon + Title */}
+        <div className="flex items-start gap-3 mb-2">
+          <div className={cn("p-2 rounded-lg bg-gradient-to-br shrink-0", gradientClass)}>
+            <Box className="h-4 w-4 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-sm leading-tight line-clamp-1">{brick.name}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">{brick.author}</p>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{brick.description}</p>
+
+        {/* Badges */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold", badgeClass)}>
+            {brick.category}
+          </span>
+          <Badge variant="secondary" className="text-xs">
+            {brick.type}
+          </Badge>
+          {brick.tags.map((tag) => (
+            <Badge key={tag} variant="outline" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Footer: Rating + Status */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star
+                key={i}
+                className={cn(
+                  "h-3 w-3 transition-transform",
+                  i < (hoverRating || brick.rating) ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground",
+                  onRate && "cursor-pointer hover:scale-125"
+                )}
+                onClick={onRate ? (e) => { e.stopPropagation(); onRate(i + 1) } : undefined}
+                onMouseEnter={onRate ? () => setHoverRating(i + 1) : undefined}
+                onMouseLeave={onRate ? () => setHoverRating(0) : undefined}
+              />
+            ))}
+          </div>
+          <span
+            className={cn(
+              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
+              brick.status === "Published"
+                ? "bg-green-100 text-green-700"
+                : "bg-yellow-100 text-yellow-700"
+            )}
+          >
+            {brick.status === "Published" ? "발행됨" : "초안"}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\components\ui\badge.tsx
+=======================================================
+
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
+
+const badgeVariants = cva(
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+  {
+    variants: {
+      variant: {
+        default: "border-transparent bg-primary text-primary-foreground",
+        secondary: "border-transparent bg-secondary text-secondary-foreground",
+        destructive: "border-transparent bg-destructive text-white",
+        outline: "text-foreground",
+      },
+    },
+    defaultVariants: { variant: "default" },
+  }
+)
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return <div className={cn(badgeVariants({ variant }), className)} {...props} />
+}
+
+export { Badge, badgeVariants }
+
+
+=======================================================
+File: src\components\ui\button.tsx
+=======================================================
+
+import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-200 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground shadow-lg hover:opacity-90",
+        destructive: "bg-destructive text-white shadow-sm hover:opacity-90",
+        outline: "border border-border bg-background shadow-sm hover:bg-secondary hover:text-secondary-foreground",
+        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        ghost: "hover:bg-secondary hover:text-secondary-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-9 px-4 py-2",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-10 rounded-xl px-8",
+        icon: "h-9 w-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, ...props }, ref) => {
+    return (
+      <button
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
+
+export { Button, buttonVariants }
+
+
+=======================================================
+File: src\components\ui\card.tsx
+=======================================================
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", className)} {...props} />
+  )
+)
+Card.displayName = "Card"
+
+const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+  )
+)
+CardHeader.displayName = "CardHeader"
+
+const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h3 ref={ref} className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />
+  )
+)
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, ...props }, ref) => (
+    <p ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  )
+)
+CardDescription.displayName = "CardDescription"
+
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+  )
+)
+CardContent.displayName = "CardContent"
+
+const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("flex items-center p-6 pt-0", className)} {...props} />
+  )
+)
+CardFooter.displayName = "CardFooter"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+
+
+=======================================================
+File: src\components\ui\dialog.tsx
+=======================================================
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+interface DialogProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  children: React.ReactNode
+}
+
+const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/50" onClick={() => onOpenChange?.(false)} />
+      {children}
+    </div>
+  )
+}
+
+const DialogContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        "relative z-50 w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl mx-4",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+)
+DialogContent.displayName = "DialogContent"
+
+const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col space-y-1.5 mb-4", className)} {...props} />
+)
+
+const DialogTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h2 ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+  )
+)
+DialogTitle.displayName = "DialogTitle"
+
+const DialogDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, ...props }, ref) => (
+    <p ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  )
+)
+DialogDescription.displayName = "DialogDescription"
+
+const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex justify-end gap-2 mt-6", className)} {...props} />
+)
+
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter }
+
+
+=======================================================
+File: src\components\ui\input.tsx
+=======================================================
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          "flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Input.displayName = "Input"
+
+export { Input }
+
+
+=======================================================
+File: src\components\ui\scroll-area.tsx
+=======================================================
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+const ScrollArea = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => (
+    <div ref={ref} className={cn("overflow-auto", className)} {...props}>
+      {children}
+    </div>
+  )
+)
+ScrollArea.displayName = "ScrollArea"
+
+export { ScrollArea }
+
+
+=======================================================
+File: src\components\ui\skeleton.tsx
+=======================================================
+
+import { cn } from "@/lib/utils"
+
+function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("animate-pulse rounded-md bg-muted", className)}
+      {...props}
+    />
+  )
+}
+
+export { Skeleton }
+
+
+=======================================================
+File: src\components\ui\textarea.tsx
+=======================================================
+
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, ...props }, ref) => {
+    return (
+      <textarea
+        className={cn(
+          "flex min-h-[60px] w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Textarea.displayName = "Textarea"
+
+export { Textarea }
+
+
+=======================================================
+File: src\global.d.ts
+=======================================================
+
+// Electron webview JSX support
+declare namespace JSX {
+  interface IntrinsicElements {
+    webview: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      src?: string
+      style?: React.CSSProperties
+    }
+  }
+}
+
+interface Window {
+  electronAPI?: {
+    readStore:  (key: string) => Promise<unknown>
+    writeStore: (key: string, data: unknown) => Promise<void>
+    callAI: (opts: {
+      provider: string
+      apiKey: string
+      messages: { role: 'user' | 'assistant'; content: string }[]
+      endpoint?: string
+    }) => Promise<string>
+  }
+}
+
+
+=======================================================
+File: src\index.css
+=======================================================
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --dur-fast: 120ms;
+  --dur-medium: 200ms;
+  --dur-slow: 360ms;
+  --dur-attention: 280ms;
+  --ease-standard: cubic-bezier(.2, .0, .2, 1);
+  --ease-emphasized: cubic-bezier(.4, 0, .2, 1);
+  --ease-emphasized-decel: cubic-bezier(0, 0, .2, 1);
+  --ease-emphasized-accel: cubic-bezier(.4, 0, 1, 1);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  --radius: 0.75rem;
+
+  --background: oklch(0.98 0.005 240);
+  --foreground: oklch(0.20 0.02 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.20 0.02 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.20 0.02 250);
+  --primary: oklch(0.50 0.18 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.94 0.03 240);
+  --secondary-foreground: oklch(0.35 0.10 250);
+  --muted: oklch(0.95 0.01 240);
+  --muted-foreground: oklch(0.50 0.02 250);
+  --accent: oklch(0.70 0.18 155);
+  --accent-foreground: oklch(0.20 0.05 155);
+  --destructive: oklch(0.60 0.22 25);
+  --border: oklch(0.90 0.02 240);
+  --input: oklch(0.90 0.02 240);
+  --ring: oklch(0.50 0.18 250);
+  --chart-1: oklch(0.55 0.20 250);
+  --chart-2: oklch(0.65 0.20 155);
+  --chart-3: oklch(0.70 0.18 45);
+  --chart-4: oklch(0.60 0.22 320);
+  --chart-5: oklch(0.65 0.20 25);
+  --sidebar: oklch(0.25 0.05 250);
+  --sidebar-foreground: oklch(0.95 0.01 240);
+  --sidebar-primary: oklch(0.65 0.18 155);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.35 0.06 250);
+  --sidebar-accent-foreground: oklch(0.95 0.01 240);
+  --sidebar-border: oklch(0.35 0.04 250);
+  --sidebar-ring: oklch(0.50 0.18 250);
+}
+
+.brick-blue { background: oklch(0.55 0.20 250); }
+.brick-green { background: oklch(0.65 0.20 155); }
+.brick-orange { background: oklch(0.70 0.18 45); }
+.brick-purple { background: oklch(0.60 0.22 320); }
+.brick-red { background: oklch(0.65 0.20 25); }
+.brick-yellow { background: oklch(0.85 0.18 90); }
+.brick-teal { background: oklch(0.60 0.15 195); }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  text-align: left;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes brick-pop {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-brick-pop { animation: brick-pop 0.3s ease-out forwards; }
+
+.lego-pattern {
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(255,255,255,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 75% 25%, rgba(255,255,255,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 25% 75%, rgba(255,255,255,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(255,255,255,0.3) 0%, transparent 50%);
+  background-size: 40px 40px;
+}
+
+
+=======================================================
+File: src\lib\store.ts
+=======================================================
+
+import type { Brick, Assembly } from "@/types";
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  재무: "from-blue-500 to-blue-400",
+  인사: "from-green-500 to-green-400",
+  대시보드: "from-orange-500 to-orange-400",
+  구매: "from-purple-500 to-purple-400",
+  품질: "from-red-500 to-red-400",
+};
+
+export const CATEGORY_DOT_COLORS: Record<string, string> = {
+  재무: "bg-blue-500",
+  인사: "bg-green-500",
+  대시보드: "bg-orange-500",
+  구매: "bg-purple-500",
+  품질: "bg-red-500",
+};
+
+export const CATEGORY_BADGE_COLORS: Record<string, string> = {
+  재무: "bg-blue-100 text-blue-700",
+  인사: "bg-green-100 text-green-700",
+  대시보드: "bg-orange-100 text-orange-700",
+  구매: "bg-purple-100 text-purple-700",
+  품질: "bg-red-100 text-red-700",
+};
+
+export const TAGS = ["Finance", "HR", "Purchase", "Quality", "Dashboard"];
+
+let bricks: Brick[] = [];
+let assemblies: Assembly[] = [];
+
+export async function initStore(): Promise<void> {
+  if (window.electronAPI) {
+    const b = await window.electronAPI.readStore('bricks');
+    const a = await window.electronAPI.readStore('assemblies');
+    bricks = Array.isArray(b) ? (b as Brick[]) : [];
+    assemblies = Array.isArray(a) ? (a as Assembly[]) : [];
+  }
+}
+
+function persist(): void {
+  void window.electronAPI?.writeStore('bricks', bricks);
+  void window.electronAPI?.writeStore('assemblies', assemblies);
+}
+
+export function getBricks(): Brick[] {
+  return [...bricks];
+}
+
+export function getAssemblies(): Assembly[] {
+  return [...assemblies];
+}
+
+export function addBrick(brick: Omit<Brick, "id" | "createdAt">): Brick {
+  const newBrick: Brick = {
+    ...brick,
+    id: String(Date.now()),
+    createdAt: new Date().toISOString().split("T")[0],
+  };
+  bricks = [...bricks, newBrick];
+  persist();
+  return newBrick;
+}
+
+export function updateBrick(id: string, updates: Partial<Brick>): void {
+  bricks = bricks.map((b) => (b.id === id ? { ...b, ...updates } : b));
+  persist();
+}
+
+export function deleteBrick(id: string): void {
+  bricks = bricks.filter((b) => b.id !== id);
+  persist();
+}
+
+export function addAssembly(assembly: Omit<Assembly, "id" | "createdAt">): Assembly {
+  const newAssembly: Assembly = {
+    ...assembly,
+    id: String(Date.now()),
+    createdAt: new Date().toISOString().split("T")[0],
+  };
+  assemblies = [...assemblies, newAssembly];
+  persist();
+  return newAssembly;
+}
+
+export function updateAssembly(id: string, updates: Partial<Assembly>): void {
+  assemblies = assemblies.map((a) => (a.id === id ? { ...a, ...updates } : a));
+  persist();
+}
+
+export function deleteAssembly(id: string): void {
+  assemblies = assemblies.filter((a) => a.id !== id);
+  persist();
+}
+
+
+=======================================================
+File: src\lib\utils.ts
+=======================================================
+
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+
+=======================================================
+File: src\main.tsx
+=======================================================
+
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createHashRouter, RouterProvider } from 'react-router-dom'
+import './index.css'
+import Layout from './pages/_layout'
+import Dashboard from './pages/index'
+import Create from './pages/create'
+import Storage from './pages/storage'
+import Assemble from './pages/assemble'
+import MyBricks from './pages/my-bricks'
+import NotFound from './pages/not-found'
+import { initStore } from './lib/store'
+
+const router = createHashRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: 'create', element: <Create /> },
+      { path: 'storage', element: <Storage /> },
+      { path: 'assemble', element: <Assemble /> },
+      { path: 'my-bricks', element: <MyBricks /> },
+    ],
+  },
+  { path: '*', element: <NotFound /> },
+])
+
+async function bootstrap() {
+  await initStore()
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <RouterProvider router={router} />
+    </StrictMode>,
+  )
+}
+
+void bootstrap()
+
+
+=======================================================
+File: src\pages\assemble.tsx
+=======================================================
+
+import { useState } from "react"
+import { Plus, X, Layers, Box, ArrowRight, Save, CheckCircle2 } from "lucide-react"
+import { getBricks, addAssembly } from "@/lib/store"
+import type { Brick, BrickStatus } from "@/types"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { CATEGORY_COLORS } from "@/lib/store"
+import { cn } from "@/lib/utils"
+
+export default function Assemble() {
+  const allBricks = getBricks().filter((b) => b.status === "Published")
+  const [selectedBricks, setSelectedBricks] = useState<Brick[]>([])
+  const [assemblyName, setAssemblyName] = useState("")
+  const [assemblyDesc, setAssemblyDesc] = useState("")
+  const [assemblyStatus, setAssemblyStatus] = useState<BrickStatus>("Draft")
+  const [saved, setSaved] = useState(false)
+
+  const addToAssembly = (brick: Brick) => {
+    if (!selectedBricks.find((b) => b.id === brick.id)) {
+      setSelectedBricks((prev) => [...prev, brick])
+    }
+  }
+
+  const removeFromAssembly = (brickId: string) => {
+    setSelectedBricks((prev) => prev.filter((b) => b.id !== brickId))
+  }
+
+  const handleSave = () => {
+    if (!assemblyName.trim() || selectedBricks.length < 2) return
+    addAssembly({
+      name: assemblyName.trim(),
+      author: "경신 사원",
+      description: assemblyDesc.trim(),
+      bricks: selectedBricks,
+      status: assemblyStatus,
+    })
+    setSaved(true)
+    setTimeout(() => {
+      setSaved(false)
+      setSelectedBricks([])
+      setAssemblyName("")
+      setAssemblyDesc("")
+    }, 2000)
+  }
+
+  return (
+    <div className="p-6 h-full">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">브릭 조립</h1>
+        <p className="text-muted-foreground text-sm mt-1">여러 브릭을 조합해 복합 시스템을 만드세요</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-180px)]">
+        {/* Left: Available bricks */}
+        <div className="flex flex-col rounded-xl border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b bg-muted/30">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <Box className="h-4 w-4" />
+              사용 가능한 브릭 ({allBricks.length})
+            </p>
+            <p className="text-xs text-muted-foreground">클릭하여 추가</p>
+          </div>
+          <div className="flex-1 overflow-auto p-3 space-y-2">
+            {allBricks.map((brick) => {
+              const isSelected = !!selectedBricks.find((b) => b.id === brick.id)
+              const gradientClass = CATEGORY_COLORS[brick.category] ?? "from-gray-500 to-gray-400"
+              return (
+                <button
+                  key={brick.id}
+                  onClick={() => addToAssembly(brick)}
+                  disabled={isSelected}
+                  className={cn(
+                    "w-full text-left rounded-lg border p-3 transition-all",
+                    isSelected
+                      ? "opacity-40 cursor-not-allowed bg-muted"
+                      : "hover:bg-secondary hover:border-primary/30 hover:shadow-sm"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={cn("w-2 h-2 rounded-full bg-gradient-to-br shrink-0", gradientClass)} />
+                    <span className="text-sm font-medium truncate">{brick.name}</span>
+                    {!isSelected && <Plus className="h-3.5 w-3.5 ml-auto shrink-0 text-muted-foreground" />}
+                    {isSelected && <CheckCircle2 className="h-3.5 w-3.5 ml-auto shrink-0 text-green-500" />}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 ml-4 line-clamp-1">{brick.description}</p>
+                  <div className="flex items-center gap-1.5 mt-1.5 ml-4">
+                    <span className="text-xs text-muted-foreground">{brick.category}</span>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-xs text-muted-foreground">{brick.type}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Center: Assembly canvas */}
+        <div className="flex flex-col rounded-xl border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b bg-muted/30">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <Layers className="h-4 w-4 text-purple-500" />
+              조립 캔버스
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {selectedBricks.length}개 선택됨 {selectedBricks.length < 2 && "(최소 2개 필요)"}
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4">
+            {selectedBricks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-border flex items-center justify-center mb-3">
+                  <Layers className="h-6 w-6 opacity-30" />
+                </div>
+                <p className="text-sm font-medium">왼쪽에서 브릭을 선택하세요</p>
+                <p className="text-xs mt-1 opacity-70">브릭을 조립해 복합 시스템을 만드세요</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {selectedBricks.map((brick, idx) => {
+                  const gradientClass = CATEGORY_COLORS[brick.category] ?? "from-gray-500 to-gray-400"
+                  return (
+                    <div key={brick.id}>
+                      <div className="flex items-center gap-2 p-3 rounded-lg border bg-background animate-brick-pop">
+                        <div className={cn("w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center shrink-0", gradientClass)}>
+                          <Box className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{brick.name}</p>
+                          <p className="text-xs text-muted-foreground">{brick.category} · {brick.type}</p>
+                        </div>
+                        <button
+                          onClick={() => removeFromAssembly(brick.id)}
+                          className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {idx < selectedBricks.length - 1 && (
+                        <div className="flex items-center justify-center py-1">
+                          <ArrowRight className="h-4 w-4 text-muted-foreground rotate-90" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* Visual connection indicator */}
+                {selectedBricks.length >= 2 && (
+                  <div className="mt-4 p-3 rounded-lg bg-violet-50 border border-violet-200">
+                    <div className="flex items-center gap-2 text-violet-700">
+                      <Layers className="h-4 w-4" />
+                      <span className="text-xs font-medium">복합 시스템 구성 완료</span>
+                    </div>
+                    <p className="text-xs text-violet-600 mt-1">
+                      {selectedBricks.length}개의 브릭이 연결되었습니다
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Assembly info */}
+        <div className="flex flex-col rounded-xl border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b bg-muted/30">
+            <p className="text-sm font-semibold">조립체 정보</p>
+            <p className="text-xs text-muted-foreground">복합 브릭 시스템 정보를 입력하세요</p>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">시스템 이름 *</label>
+              <Input
+                value={assemblyName}
+                onChange={(e) => setAssemblyName(e.target.value)}
+                placeholder="예: 월간 재무 보고 시스템"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">설명</label>
+              <Textarea
+                value={assemblyDesc}
+                onChange={(e) => setAssemblyDesc(e.target.value)}
+                placeholder="이 복합 시스템의 목적과 기능을 설명하세요"
+                rows={3}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">상태</label>
+              <div className="flex gap-2">
+                {(["Draft", "Published"] as BrickStatus[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setAssemblyStatus(s)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      assemblyStatus === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {s === "Published" ? "발행" : "초안"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary */}
+            {selectedBricks.length > 0 && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs font-medium text-muted-foreground mb-2">포함된 브릭</p>
+                <div className="space-y-1">
+                  {selectedBricks.map((b) => (
+                    <div key={b.id} className="flex items-center gap-2 text-xs">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                      <span className="truncate">{b.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 border-t">
+            {saved ? (
+              <div className="flex items-center justify-center gap-2 py-2.5 text-green-600 font-medium text-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                저장 완료!
+              </div>
+            ) : (
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleSave}
+                disabled={!assemblyName.trim() || selectedBricks.length < 2}
+              >
+                <Save className="h-4 w-4" />
+                조립체 저장
+              </Button>
+            )}
+            {selectedBricks.length < 2 && selectedBricks.length > 0 && (
+              <p className="text-xs text-muted-foreground text-center mt-2">최소 2개의 브릭이 필요합니다</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\pages\create.tsx
+=======================================================
+
+import { useState, useRef, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
+import { Bot, Send, User, Loader2, Plus, X, Sparkles, Key, CheckCircle2, Globe, MessageSquare } from "lucide-react"
+import type { BrickCategory, BrickType, BrickStatus } from "@/types"
+import { addBrick, TAGS } from "@/lib/store"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+
+interface ChatMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
+type Provider = "claude" | "gemini" | "chatgpt" | "copilot" | "mimo"
+type ChatMode = "api" | "web"
+
+const CATEGORIES: BrickCategory[] = ["재무", "인사", "대시보드", "구매", "품질"]
+const TYPES: BrickType[] = ["단일", "복합"]
+const STATUSES: BrickStatus[] = ["Draft", "Published"]
+
+const PROVIDERS: { id: Provider; label: string }[] = [
+  { id: "claude",  label: "Claude"  },
+  { id: "gemini",  label: "Gemini"  },
+  { id: "chatgpt", label: "ChatGPT" },
+  { id: "copilot", label: "Copilot" },
+  { id: "mimo",    label: "Mimo"    },
+]
+
+const WEB_URLS: Record<Provider, string> = {
+  claude:  "https://claude.ai",
+  gemini:  "https://gemini.google.com",
+  chatgpt: "https://chatgpt.com",
+  copilot: "https://copilot.microsoft.com",
+  mimo:    "https://mimo.ai",
+}
+
+const STORAGE_KEYS: Record<Provider, string> = {
+  claude:  "ai_key_claude",
+  gemini:  "ai_key_gemini",
+  chatgpt: "ai_key_chatgpt",
+  copilot: "ai_key_copilot",
+  mimo:    "ai_key_mimo",
+}
+
+const AI_RESPONSES: Record<string, { name: string; description: string; category: BrickCategory; tags: string[] }> = {
+  재무: {
+    name: "재무 현황 리포트 자동화",
+    description: "월별 재무 데이터를 자동으로 집계하고 시각화합니다.",
+    category: "재무",
+    tags: ["Finance"],
+  },
+  인사: {
+    name: "인사 관리 통합 브릭",
+    description: "직원 정보 관리, 근태 기록, 성과 평가를 통합 관리합니다.",
+    category: "인사",
+    tags: ["HR"],
+  },
+  구매: {
+    name: "구매 요청 자동화 워크플로우",
+    description: "구매 요청서 작성부터 승인, 발주까지의 전 과정을 자동화합니다.",
+    category: "구매",
+    tags: ["Purchase"],
+  },
+  품질: {
+    name: "품질 관리 체크 시스템",
+    description: "생산 라인별 품질 기준 관리와 불량 이력 추적이 가능합니다.",
+    category: "품질",
+    tags: ["Quality"],
+  },
+  대시보드: {
+    name: "경영 KPI 대시보드",
+    description: "회사 전체 KPI를 실시간으로 모니터링하는 대시보드입니다.",
+    category: "대시보드",
+    tags: ["Dashboard"],
+  },
+}
+
+function getKeywordSuggestion(input: string): typeof AI_RESPONSES[string] {
+  for (const key of Object.keys(AI_RESPONSES)) {
+    if (input.includes(key)) return AI_RESPONSES[key]
+  }
+  return {
+    name: "업무 자동화 브릭",
+    description: "반복적인 업무 프로세스를 자동화하는 브릭입니다.",
+    category: "대시보드",
+    tags: ["Dashboard"],
+  }
+}
+
+function loadKey(provider: Provider): string {
+  return localStorage.getItem(STORAGE_KEYS[provider]) ?? ""
+}
+
+function saveKey(provider: Provider, key: string): void {
+  if (key) {
+    localStorage.setItem(STORAGE_KEYS[provider], key)
+  } else {
+    localStorage.removeItem(STORAGE_KEYS[provider])
+  }
+}
+
+export default function Create() {
+  const navigate = useNavigate()
+
+  // Provider / mode state
+  const [provider, setProvider] = useState<Provider>(
+    () => (localStorage.getItem("ai_provider") as Provider | null) ?? "claude"
+  )
+  const [chatMode, setChatMode] = useState<ChatMode>("api")
+
+  // API key state per provider
+  const [apiKey, setApiKey] = useState(() => loadKey(provider))
+  const [apiKeyInput, setApiKeyInput] = useState("")
+  const [showKeyInput, setShowKeyInput] = useState(false)
+
+  // Mimo endpoint
+  const [mimoEndpoint, setMimoEndpoint] = useState(
+    () => localStorage.getItem("ai_endpoint_mimo") ?? ""
+  )
+  const [mimoEndpointInput, setMimoEndpointInput] = useState("")
+
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content: "안녕하세요! 어떤 업무 브릭을 만들고 싶으신가요? 예를 들어 '재무 보고서 자동화 브릭을 만들고 싶어요' 처럼 말씀해 주세요.",
+    },
+  ])
+  const [inputValue, setInputValue] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Form state
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [category, setCategory] = useState<BrickCategory>("재무")
+  const [type, setType] = useState<BrickType>("단일")
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [status, setStatus] = useState<BrickStatus>("Draft")
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // When provider changes, reload the saved key
+  const handleProviderChange = (p: Provider) => {
+    setProvider(p)
+    localStorage.setItem("ai_provider", p)
+    setApiKey(loadKey(p))
+    setApiKeyInput("")
+    setShowKeyInput(false)
+  }
+
+  const saveApiKey = () => {
+    const trimmed = apiKeyInput.trim()
+    saveKey(provider, trimmed)
+    setApiKey(trimmed)
+    setApiKeyInput("")
+    setShowKeyInput(false)
+    if (provider === "mimo") {
+      const ep = mimoEndpointInput.trim()
+      localStorage.setItem("ai_endpoint_mimo", ep)
+      setMimoEndpoint(ep)
+      setMimoEndpointInput("")
+    }
+  }
+
+  const clearApiKey = () => {
+    saveKey(provider, "")
+    setApiKey("")
+    if (provider === "mimo") {
+      localStorage.removeItem("ai_endpoint_mimo")
+      setMimoEndpoint("")
+    }
+  }
+
+  const handleSendMessage = async () => {
+    const trimmed = inputValue.trim()
+    if (!trimmed || isLoading) return
+
+    const userMessage: ChatMessage = { role: "user", content: trimmed }
+    setMessages((prev) => [...prev, userMessage])
+    setInputValue("")
+    setIsLoading(true)
+
+    try {
+      if (window.electronAPI && apiKey) {
+        const raw = await window.electronAPI.callAI({
+          provider,
+          apiKey,
+          messages: [{ role: "user", content: trimmed }],
+          endpoint: provider === "mimo" ? mimoEndpoint || undefined : undefined,
+        })
+
+        let suggestion: { name: string; description: string; category: BrickCategory; tags: string[]; message?: string }
+        try {
+          const jsonStr = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+          suggestion = JSON.parse(jsonStr)
+        } catch {
+          setMessages((prev) => [...prev, { role: "assistant", content: raw }])
+          setIsLoading(false)
+          return
+        }
+
+        const aiMessage = suggestion.message
+          ?? `"${suggestion.name}" 브릭을 추천드립니다!\n\n${suggestion.description}\n\n오른쪽 폼에 내용을 자동으로 채워드렸습니다.`
+
+        setMessages((prev) => [...prev, { role: "assistant", content: aiMessage }])
+        setName(suggestion.name)
+        setDescription(suggestion.description)
+        if (CATEGORIES.includes(suggestion.category as BrickCategory)) {
+          setCategory(suggestion.category as BrickCategory)
+        }
+        setSelectedTags(suggestion.tags.filter((t) => TAGS.includes(t)))
+      } else {
+        await new Promise((res) => setTimeout(res, 1500))
+        const suggestion = getKeywordSuggestion(trimmed)
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `좋은 아이디어네요! "${suggestion.name}" 브릭을 추천드립니다.\n\n${suggestion.description}\n\n오른쪽 폼에 내용을 자동으로 채워드렸습니다.`,
+          },
+        ])
+        setName(suggestion.name)
+        setDescription(suggestion.description)
+        setCategory(suggestion.category)
+        setSelectedTags(suggestion.tags)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다."
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `오류가 발생했습니다: ${msg}` },
+      ])
+    }
+
+    setIsLoading(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      void handleSendMessage()
+    }
+  }
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    )
+  }
+
+  const handleCreate = () => {
+    if (!name.trim()) return
+    addBrick({
+      name: name.trim(),
+      author: "경신 사원",
+      description: description.trim(),
+      category,
+      type,
+      tags: selectedTags,
+      rating: 3,
+      status,
+    })
+    navigate("/my-bricks")
+  }
+
+  const providerLabel = PROVIDERS.find((p) => p.id === provider)?.label ?? provider
+
+  return (
+    <div className="p-6 h-full">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">새 브릭 만들기</h1>
+        <p className="text-muted-foreground text-sm mt-1">AI 어시스턴트와 대화하며 업무 브릭을 생성하세요</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-180px)]">
+        {/* AI Chat Panel */}
+        <div className="flex flex-col rounded-xl border bg-card overflow-hidden">
+
+          {/* Header: provider tabs + mode toggle */}
+          <div className="flex flex-col border-b bg-muted/30">
+            <div className="flex items-center gap-1 px-3 pt-2.5 pb-0">
+              {PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => handleProviderChange(p.id)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-all",
+                    provider === p.id
+                      ? "border-primary text-primary bg-background"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <div className="ml-auto flex items-center gap-1 mb-1">
+                <button
+                  onClick={() => setChatMode("api")}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border transition-all",
+                    chatMode === "api"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  API
+                </button>
+                <button
+                  onClick={() => setChatMode("web")}
+                  className={cn(
+                    "flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border transition-all",
+                    chatMode === "web"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Globe className="h-3 w-3" />
+                  웹
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-header: key status + sparkle */}
+            <div className="flex items-center gap-2 px-4 py-2">
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                <Bot className="h-3.5 w-3.5 text-primary-foreground" />
+              </div>
+              <p className="text-xs font-medium">{providerLabel} AI 어시스턴트</p>
+              <div className="ml-auto flex items-center gap-2">
+                {apiKey ? (
+                  <button
+                    onClick={clearApiKey}
+                    className="flex items-center gap-1 text-xs text-green-600 hover:text-red-500 transition-colors"
+                    title="클릭하여 API 키 제거"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>{providerLabel} 연결됨</span>
+                  </button>
+                ) : (
+                  chatMode === "api" && (
+                    <button
+                      onClick={() => setShowKeyInput((v) => !v)}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Key className="h-3.5 w-3.5" />
+                      <span>API 키 설정</span>
+                    </button>
+                  )
+                )}
+                <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* API key input area */}
+          {showKeyInput && !apiKey && chatMode === "api" && (
+            <div className="px-4 py-2.5 border-b bg-muted/20 space-y-2">
+              <Input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && provider !== "mimo") saveApiKey() }}
+                placeholder={provider === "claude" ? "sk-ant-..." : provider === "gemini" ? "AIza..." : "API 키 입력"}
+                className="text-xs h-8"
+              />
+              {provider === "mimo" && (
+                <Input
+                  type="text"
+                  value={mimoEndpointInput}
+                  onChange={(e) => setMimoEndpointInput(e.target.value)}
+                  placeholder="엔드포인트 URL (예: https://api.mimo.ai/v1/chat/completions)"
+                  className="text-xs h-8"
+                />
+              )}
+              <Button
+                size="sm"
+                className="h-8 text-xs w-full"
+                onClick={saveApiKey}
+                disabled={!apiKeyInput.trim()}
+              >
+                저장
+              </Button>
+            </div>
+          )}
+
+          {/* Webview mode */}
+          {chatMode === "web" ? (
+            <webview
+              src={WEB_URLS[provider]}
+              className="flex-1 w-full"
+              style={{ border: "none" }}
+            />
+          ) : (
+            <>
+              {/* Messages */}
+              <div className="flex-1 overflow-auto p-4 space-y-4">
+                {messages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse" : "flex-row")}
+                  >
+                    <div
+                      className={cn(
+                        "w-7 h-7 rounded-full flex items-center justify-center shrink-0",
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      {msg.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                    </div>
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm whitespace-pre-wrap",
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground"
+                      )}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex gap-3">
+                    <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0">
+                      <Bot className="h-4 w-4 text-accent-foreground" />
+                    </div>
+                    <div className="bg-muted rounded-xl px-3.5 py-2.5 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">분석 중...</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="p-4 border-t">
+                <div className="flex gap-2">
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="어떤 브릭을 만들고 싶으신가요?"
+                    disabled={isLoading}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={() => void handleSendMessage()}
+                    disabled={!inputValue.trim() || isLoading}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Form */}
+        <div className="flex flex-col rounded-xl border bg-card overflow-auto">
+          <div className="px-4 py-3 border-b bg-muted/30">
+            <p className="text-sm font-semibold">브릭 설정</p>
+            <p className="text-xs text-muted-foreground">브릭의 상세 정보를 설정하세요</p>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4 space-y-4">
+            {/* Name */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">브릭 이름 *</label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 월간 손익계산서 리포트"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">설명</label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="이 브릭이 어떤 역할을 하는지 설명해주세요"
+                rows={3}
+              />
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">카테고리</label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      category === cat
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Type */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">유형</label>
+              <div className="flex gap-2">
+                {TYPES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setType(t)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      type === t
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">태그</label>
+              <div className="flex flex-wrap gap-2">
+                {TAGS.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                      selectedTags.includes(tag)
+                        ? "bg-accent text-accent-foreground border-accent"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {selectedTags.includes(tag) ? (
+                      <X className="h-3 w-3" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">상태</label>
+              <div className="flex gap-2">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatus(s)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      status === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {s === "Published" ? "발행" : "초안"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 border-t">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleCreate}
+              disabled={!name.trim()}
+            >
+              <Plus className="h-4 w-4" />
+              브릭 생성하기
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\pages\index.tsx
+=======================================================
+
+import { Link } from "react-router-dom"
+import { Plus, Box, Layers, Tag, CheckCircle2, TrendingUp } from "lucide-react"
+import { getBricks, getAssemblies } from "@/lib/store"
+import { BrickCard } from "@/components/BrickCard"
+import { AssemblyCard } from "@/components/AssemblyCard"
+import { Button } from "@/components/ui/button"
+
+export default function Dashboard() {
+  const bricks = getBricks()
+  const assemblies = getAssemblies()
+
+  const publishedCount = bricks.filter((b) => b.status === "Published").length
+  const complexCount = bricks.filter((b) => b.type === "복합").length
+  const categories = new Set(bricks.map((b) => b.category)).size
+
+  const topBricks = bricks
+    .filter((b) => b.status === "Published")
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 6)
+
+  const stats = [
+    { label: "전체 브릭", value: bricks.length, icon: Box, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: "발행됨", value: publishedCount, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+    { label: "복합 시스템", value: complexCount, icon: Layers, color: "text-purple-600", bg: "bg-purple-50" },
+    { label: "카테고리", value: categories, icon: Tag, color: "text-orange-600", bg: "bg-orange-50" },
+  ]
+
+  return (
+    <div className="p-6 space-y-8">
+      {/* Hero Banner */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-blue-400 p-8 text-white">
+        <div className="lego-pattern absolute inset-0 opacity-20" />
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Box className="h-6 w-6 animate-float" />
+              <span className="text-sm font-medium opacity-80">Kyungshin 디지털 레고</span>
+            </div>
+            <h1 className="text-3xl font-bold mb-2 leading-tight">
+              나의 업무를<br />블록으로 조립하세요
+            </h1>
+            <p className="text-white/70 text-sm max-w-sm">
+              재사용 가능한 업무 모듈을 만들고, 조합하여<br />
+              더 스마트한 업무 환경을 구축하세요.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 shrink-0">
+            <Link to="/create">
+              <Button size="lg" className="bg-white text-primary hover:bg-white/90 font-semibold gap-2 w-full">
+                <Plus className="h-4 w-4" />
+                새 브릭 만들기
+              </Button>
+            </Link>
+            <Link to="/assemble">
+              <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10 w-full gap-2">
+                <Layers className="h-4 w-4" />
+                브릭 조립하기
+              </Button>
+            </Link>
+          </div>
+        </div>
+        {/* Decorative bricks */}
+        <div className="absolute top-4 right-32 w-8 h-8 rounded-lg bg-white/10 border border-white/20 animate-float" style={{ animationDelay: "0.5s" }} />
+        <div className="absolute top-12 right-20 w-6 h-6 rounded-md bg-white/10 border border-white/20 animate-float" style={{ animationDelay: "1s" }} />
+        <div className="absolute bottom-6 right-40 w-10 h-6 rounded-lg bg-white/10 border border-white/20 animate-float" style={{ animationDelay: "1.5s" }} />
+      </section>
+
+      {/* Stats */}
+      <section>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-xl border bg-card p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-lg ${stat.bg}`}>
+                <stat.icon className={`h-5 w-5 ${stat.color}`} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Popular Bricks */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              최근 생성된 인기 브릭
+            </h2>
+            <p className="text-sm text-muted-foreground">별점 높은 발행된 브릭을 확인하세요</p>
+          </div>
+          <Link to="/storage">
+            <Button variant="ghost" size="sm">전체 보기</Button>
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {topBricks.map((brick) => (
+            <BrickCard key={brick.id} brick={brick} />
+          ))}
+        </div>
+      </section>
+
+      {/* Assemblies */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Layers className="h-5 w-5 text-purple-500" />
+              가장 많이 조립된 복합 브릭
+            </h2>
+            <p className="text-sm text-muted-foreground">여러 브릭을 조합한 복합 시스템</p>
+          </div>
+          <Link to="/assemble">
+            <Button variant="ghost" size="sm">조립 시작</Button>
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {assemblies.map((assembly) => (
+            <AssemblyCard key={assembly.id} assembly={assembly} />
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\pages\my-bricks.tsx
+=======================================================
+
+import { useState, useEffect } from "react"
+import { Pencil, Trash2, Box, Layers, CheckCircle2, FileEdit, Plus } from "lucide-react"
+import { Link } from "react-router-dom"
+import { getBricks, getAssemblies, updateBrick, deleteBrick, updateAssembly, deleteAssembly } from "@/lib/store"
+import type { Brick, Assembly, BrickCategory, BrickType, BrickStatus } from "@/types"
+import { BrickCard } from "@/components/BrickCard"
+import { AssemblyCard } from "@/components/AssemblyCard"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
+
+const CATEGORIES: BrickCategory[] = ["재무", "인사", "대시보드", "구매", "품질"]
+const TYPES: BrickType[] = ["단일", "복합"]
+const STATUSES: BrickStatus[] = ["Draft", "Published"]
+const MY_AUTHOR = "경신 사원"
+
+export default function MyBricks() {
+  const [bricks, setBricks] = useState<Brick[]>([])
+  const [assemblies, setAssemblies] = useState<Assembly[]>([])
+  const [editingBrick, setEditingBrick] = useState<Brick | null>(null)
+  const [deletingBrick, setDeletingBrick] = useState<Brick | null>(null)
+  const [editingAssembly, setEditingAssembly] = useState<Assembly | null>(null)
+  const [deletingAssembly, setDeletingAssembly] = useState<Assembly | null>(null)
+
+  // Brick edit form state
+  const [editName, setEditName] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [editCategory, setEditCategory] = useState<BrickCategory>("재무")
+  const [editType, setEditType] = useState<BrickType>("단일")
+  const [editStatus, setEditStatus] = useState<BrickStatus>("Draft")
+
+  // Assembly edit form state
+  const [editAssemblyName, setEditAssemblyName] = useState("")
+  const [editAssemblyDesc, setEditAssemblyDesc] = useState("")
+  const [editAssemblyStatus, setEditAssemblyStatus] = useState<BrickStatus>("Draft")
+
+  const refresh = () => {
+    setBricks(getBricks())
+    setAssemblies(getAssemblies())
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const myBricks = bricks.filter((b) => b.author === MY_AUTHOR)
+  const myAssemblies = assemblies.filter((a) => a.author === MY_AUTHOR)
+
+  const publishedCount = myBricks.filter((b) => b.status === "Published").length
+  const draftCount = myBricks.filter((b) => b.status === "Draft").length
+
+  const openEdit = (brick: Brick) => {
+    setEditingBrick(brick)
+    setEditName(brick.name)
+    setEditDescription(brick.description)
+    setEditCategory(brick.category)
+    setEditType(brick.type)
+    setEditStatus(brick.status)
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingBrick || !editName.trim()) return
+    updateBrick(editingBrick.id, {
+      name: editName.trim(),
+      description: editDescription.trim(),
+      category: editCategory,
+      type: editType,
+      status: editStatus,
+    })
+    setEditingBrick(null)
+    refresh()
+  }
+
+  const handleDelete = () => {
+    if (!deletingBrick) return
+    deleteBrick(deletingBrick.id)
+    setDeletingBrick(null)
+    refresh()
+  }
+
+  const openEditAssembly = (assembly: Assembly) => {
+    setEditingAssembly(assembly)
+    setEditAssemblyName(assembly.name)
+    setEditAssemblyDesc(assembly.description)
+    setEditAssemblyStatus(assembly.status)
+  }
+
+  const handleSaveAssemblyEdit = () => {
+    if (!editingAssembly || !editAssemblyName.trim()) return
+    updateAssembly(editingAssembly.id, {
+      name: editAssemblyName.trim(),
+      description: editAssemblyDesc.trim(),
+      status: editAssemblyStatus,
+    })
+    setEditingAssembly(null)
+    refresh()
+  }
+
+  const handleDeleteAssembly = () => {
+    if (!deletingAssembly) return
+    deleteAssembly(deletingAssembly.id)
+    setDeletingAssembly(null)
+    refresh()
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">내 브릭</h1>
+          <p className="text-muted-foreground text-sm mt-1">내가 만들고 조립한 브릭을 관리하세요</p>
+        </div>
+        <Link to="/create">
+          <Button size="sm" className="gap-2">
+            <Plus className="h-4 w-4" />
+            새 브릭 만들기
+          </Button>
+        </Link>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="rounded-xl border bg-card p-4 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-blue-50">
+            <Box className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{myBricks.length}</p>
+            <p className="text-xs text-muted-foreground">내 브릭</p>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-card p-4 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-green-50">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{publishedCount}</p>
+            <p className="text-xs text-muted-foreground">발행됨</p>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-card p-4 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-yellow-50">
+            <FileEdit className="h-5 w-5 text-yellow-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{draftCount}</p>
+            <p className="text-xs text-muted-foreground">초안</p>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-card p-4 flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-purple-50">
+            <Layers className="h-5 w-5 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{myAssemblies.length}</p>
+            <p className="text-xs text-muted-foreground">조립체</p>
+          </div>
+        </div>
+      </div>
+
+      {/* My Bricks */}
+      <section>
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <Box className="h-5 w-5 text-primary" />
+          내가 만든 브릭
+        </h2>
+        {myBricks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-card">
+            <Box className="h-10 w-10 text-muted-foreground/40 mb-3" />
+            <p className="text-muted-foreground font-medium">아직 만든 브릭이 없습니다</p>
+            <Link to="/create">
+              <Button variant="link" className="mt-2 text-sm">첫 번째 브릭 만들기 →</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myBricks.map((brick) => (
+              <div key={brick.id} className="group relative">
+                <BrickCard
+                  brick={brick}
+                  onRate={(rating) => { updateBrick(brick.id, { rating }); refresh() }}
+                />
+                {/* Action overlay */}
+                <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => openEdit(brick)}
+                    className="p-1.5 rounded-lg bg-white/90 border shadow-sm hover:bg-white transition-all"
+                    title="편집"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-foreground" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingBrick(brick)}
+                    className="p-1.5 rounded-lg bg-white/90 border shadow-sm hover:bg-destructive hover:text-white transition-all"
+                    title="삭제"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* My Assemblies */}
+      <section>
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <Layers className="h-5 w-5 text-purple-500" />
+          내가 조립한 브릭
+        </h2>
+        {myAssemblies.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center border rounded-xl bg-card">
+            <Layers className="h-10 w-10 text-muted-foreground/40 mb-3" />
+            <p className="text-muted-foreground font-medium">아직 조립한 브릭이 없습니다</p>
+            <Link to="/assemble">
+              <Button variant="link" className="mt-2 text-sm">브릭 조립하러 가기 →</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myAssemblies.map((assembly) => (
+              <div key={assembly.id} className="group relative">
+                <AssemblyCard assembly={assembly} />
+                <div className="absolute top-3 right-3 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => openEditAssembly(assembly)}
+                    className="p-1.5 rounded-lg bg-white/90 border shadow-sm hover:bg-white transition-all"
+                    title="편집"
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-foreground" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingAssembly(assembly)}
+                    className="p-1.5 rounded-lg bg-white/90 border shadow-sm hover:bg-destructive hover:text-white transition-all"
+                    title="삭제"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Brick Edit Dialog */}
+      <Dialog open={!!editingBrick} onOpenChange={(open) => !open && setEditingBrick(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>브릭 편집</DialogTitle>
+            <DialogDescription>브릭 정보를 수정하세요</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">브릭 이름 *</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">설명</label>
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">카테고리</label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setEditCategory(cat)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      editCategory === cat
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">유형</label>
+              <div className="flex gap-2">
+                {TYPES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setEditType(t)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      editType === t
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">상태</label>
+              <div className="flex gap-2">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setEditStatus(s)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      editStatus === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {s === "Published" ? "발행" : "초안"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingBrick(null)}>취소</Button>
+            <Button onClick={handleSaveEdit} disabled={!editName.trim()}>저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Brick Delete Confirmation Dialog */}
+      <Dialog open={!!deletingBrick} onOpenChange={(open) => !open && setDeletingBrick(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>브릭 삭제</DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold text-foreground">"{deletingBrick?.name}"</span>을(를) 삭제하시겠습니까?
+              이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingBrick(null)}>취소</Button>
+            <Button variant="destructive" onClick={handleDelete}>삭제</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assembly Edit Dialog */}
+      <Dialog open={!!editingAssembly} onOpenChange={(open) => !open && setEditingAssembly(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>조립체 편집</DialogTitle>
+            <DialogDescription>조립체 정보를 수정하세요 (브릭 구성 변경은 조립 페이지에서)</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">시스템 이름 *</label>
+              <Input value={editAssemblyName} onChange={(e) => setEditAssemblyName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">설명</label>
+              <Textarea
+                value={editAssemblyDesc}
+                onChange={(e) => setEditAssemblyDesc(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">상태</label>
+              <div className="flex gap-2">
+                {STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setEditAssemblyStatus(s)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      editAssemblyStatus === s
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background border-border hover:bg-secondary"
+                    )}
+                  >
+                    {s === "Published" ? "발행" : "초안"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingAssembly(null)}>취소</Button>
+            <Button onClick={handleSaveAssemblyEdit} disabled={!editAssemblyName.trim()}>저장</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assembly Delete Confirmation Dialog */}
+      <Dialog open={!!deletingAssembly} onOpenChange={(open) => !open && setDeletingAssembly(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>조립체 삭제</DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold text-foreground">"{deletingAssembly?.name}"</span>을(를) 삭제하시겠습니까?
+              이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingAssembly(null)}>취소</Button>
+            <Button variant="destructive" onClick={handleDeleteAssembly}>삭제</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\pages\not-found.tsx
+=======================================================
+
+import { Link } from "react-router-dom"
+import { Box, Home } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+export default function NotFound() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <div className="flex justify-center mb-6">
+          <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
+            <Box className="h-10 w-10 text-muted-foreground" />
+          </div>
+        </div>
+        <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
+        <h2 className="text-xl font-semibold mb-2">페이지를 찾을 수 없습니다</h2>
+        <p className="text-muted-foreground mb-8">요청하신 페이지가 존재하지 않거나 이동되었습니다.</p>
+        <Link to="/">
+          <Button size="lg" className="gap-2">
+            <Home className="h-4 w-4" />
+            대시보드로 돌아가기
+          </Button>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\pages\storage.tsx
+=======================================================
+
+import { useState, useEffect } from "react"
+import { Search, Grid3X3, List, Box } from "lucide-react"
+import { getBricks, updateBrick } from "@/lib/store"
+import type { Brick, BrickCategory, BrickType } from "@/types"
+import { BrickCard } from "@/components/BrickCard"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
+
+const CATEGORIES: (BrickCategory | "전체")[] = ["전체", "재무", "인사", "대시보드", "구매", "품질"]
+const TYPES: (BrickType | "전체")[] = ["전체", "단일", "복합"]
+
+export default function Storage() {
+  const [bricks, setBricks] = useState<Brick[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<BrickCategory | "전체">("전체")
+  const [selectedType, setSelectedType] = useState<BrickType | "전체">("전체")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setBricks(getBricks())
+      setLoading(false)
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const filtered = bricks.filter((b) => {
+    const matchesSearch =
+      !search ||
+      b.name.toLowerCase().includes(search.toLowerCase()) ||
+      b.description.toLowerCase().includes(search.toLowerCase()) ||
+      b.author.toLowerCase().includes(search.toLowerCase())
+    const matchesCategory = selectedCategory === "전체" || b.category === selectedCategory
+    const matchesType = selectedType === "전체" || b.type === selectedType
+    return matchesSearch && matchesCategory && matchesType
+  })
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold">모듈 창고</h1>
+        <p className="text-muted-foreground text-sm mt-1">모든 브릭을 검색하고 찾아보세요</p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="브릭 이름, 설명, 작성자 검색..."
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border bg-background p-1">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={cn(
+              "p-2 rounded-md transition-all",
+              viewMode === "grid" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
+            )}
+          >
+            <Grid3X3 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={cn(
+              "p-2 rounded-md transition-all",
+              viewMode === "list" ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
+            )}
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col gap-3">
+        {/* Category tabs */}
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                selectedCategory === cat
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-border hover:bg-secondary"
+              )}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        {/* Type filter */}
+        <div className="flex gap-2 items-center">
+          <span className="text-sm text-muted-foreground">유형:</span>
+          {TYPES.map((t) => (
+            <button
+              key={t}
+              onClick={() => setSelectedType(t)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
+                selectedType === t
+                  ? "bg-accent text-accent-foreground border-accent"
+                  : "bg-background border-border hover:bg-secondary"
+              )}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Results count */}
+      {!loading && (
+        <p className="text-sm text-muted-foreground">
+          {filtered.length}개의 브릭
+          {search && ` - "${search}" 검색 결과`}
+        </p>
+      )}
+
+      {/* Grid/List */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl border overflow-hidden">
+              <Skeleton className="h-2 w-full" />
+              <div className="p-4 space-y-3">
+                <div className="flex gap-3">
+                  <Skeleton className="h-10 w-10 rounded-lg" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+                <div className="flex gap-1.5">
+                  <Skeleton className="h-5 w-12 rounded-full" />
+                  <Skeleton className="h-5 w-10 rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <Box className="h-12 w-12 text-muted-foreground/50 mb-3" />
+          <h3 className="font-semibold text-lg">브릭을 찾을 수 없습니다</h3>
+          <p className="text-muted-foreground text-sm mt-1">검색 조건을 변경하거나 새 브릭을 만들어보세요</p>
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((brick) => (
+            <BrickCard
+              key={brick.id}
+              brick={brick}
+              onRate={(rating) => {
+                updateBrick(brick.id, { rating })
+                setBricks(getBricks())
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((brick) => (
+            <div
+              key={brick.id}
+              className="flex items-center gap-4 p-4 rounded-xl border bg-card hover:shadow-sm transition-all"
+            >
+              <div className="shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-blue-400 flex items-center justify-center">
+                <Box className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-sm truncate">{brick.name}</h3>
+                  <span className={cn(
+                    "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold shrink-0",
+                    brick.status === "Published" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                  )}>
+                    {brick.status === "Published" ? "발행됨" : "초안"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{brick.description}</p>
+              </div>
+              <div className="shrink-0 flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{brick.author}</span>
+                <span>·</span>
+                <span>{brick.category}</span>
+                <span>·</span>
+                <span>{brick.type}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\pages\_layout.tsx
+=======================================================
+
+import { NavLink, Outlet } from "react-router-dom"
+import {
+  LayoutDashboard,
+  Plus,
+  Archive,
+  Layers,
+  User,
+  Box,
+  ChevronRight,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+
+const navItems = [
+  { to: "/", icon: LayoutDashboard, label: "대시보드", end: true },
+  { to: "/create", icon: Plus, label: "브릭 생성", end: false },
+  { to: "/storage", icon: Archive, label: "모듈 창고", end: false },
+  { to: "/assemble", icon: Layers, label: "브릭 조립", end: false },
+  { to: "/my-bricks", icon: User, label: "내 브릭", end: false },
+]
+
+export default function Layout() {
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar */}
+      <aside className="w-64 flex flex-col bg-sidebar text-sidebar-foreground shrink-0">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-sidebar-primary">
+            <Box className="h-5 w-5 text-sidebar-primary-foreground" />
+          </div>
+          <div>
+            <p className="font-bold text-sm leading-tight">디지털 레고</p>
+            <p className="text-xs text-sidebar-foreground/60">Kyungshin ERP</p>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                  {isActive && <ChevronRight className="h-3 w-3 opacity-50" />}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-sidebar-border">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-sidebar-primary/30 flex items-center justify-center">
+              <User className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs font-medium">경신 사원</p>
+              <p className="text-xs text-sidebar-foreground/50">kyungshin.co.kr</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+    </div>
+  )
+}
+
+
+=======================================================
+File: src\types\index.ts
+=======================================================
+
+export type BrickCategory = "재무" | "인사" | "대시보드" | "구매" | "품질";
+export type BrickType = "단일" | "복합";
+export type BrickStatus = "Draft" | "Published";
+
+export interface Brick {
+  id: string;
+  name: string;
+  author: string;
+  description: string;
+  category: BrickCategory;
+  type: BrickType;
+  tags: string[];
+  rating: number;
+  status: BrickStatus;
+  createdAt: string;
+}
+
+export interface Assembly {
+  id: string;
+  name: string;
+  author: string;
+  description: string;
+  bricks: Brick[];
+  status: BrickStatus;
+  createdAt: string;
+}
+
+
+=======================================================
+File: tsconfig.app.json
+=======================================================
+
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Path aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}
+
+
+=======================================================
+File: tsconfig.json
+=======================================================
+
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+
+
+=======================================================
+File: tsconfig.node.json
+=======================================================
+
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+
+
+=======================================================
+File: vite.config.ts
+=======================================================
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  base: './',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})

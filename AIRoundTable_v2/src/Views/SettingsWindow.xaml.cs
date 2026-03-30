@@ -120,10 +120,11 @@ public partial class SettingsWindow : Window
         SelectApiTypeCombo(config.ApiType);
 
         // 브라우저 필드
-        _siteUrlBox.Text     = config.SiteUrl          ?? string.Empty;
-        _inputSelBox.Text    = config.InputSelector     ?? string.Empty;
-        _submitSelBox.Text   = config.SubmitSelector    ?? string.Empty;
-        _responseSelBox.Text = config.ResponseSelector  ?? string.Empty;
+        _siteUrlBox.Text          = config.SiteUrl          ?? string.Empty;
+        _inputSelBox.Text         = config.InputSelector     ?? string.Empty;
+        _submitSelBox.Text        = config.SubmitSelector    ?? string.Empty;
+        _responseSelBox.Text      = config.ResponseSelector  ?? string.Empty;
+        _ctrlEnterCheck.IsChecked = config.UseCtrlEnter;
 
         UpdatePanelVisibility(config.Mode);
         _loading = false;
@@ -202,6 +203,7 @@ public partial class SettingsWindow : Window
             _current.InputSelector    = _inputSelBox.Text.Trim();
             _current.SubmitSelector   = _submitSelBox.Text.Trim();
             _current.ResponseSelector = _responseSelBox.Text.Trim();
+            _current.UseCtrlEnter     = _ctrlEnterCheck.IsChecked == true;
         }
         else
         {

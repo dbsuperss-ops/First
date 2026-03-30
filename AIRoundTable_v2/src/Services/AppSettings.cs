@@ -68,6 +68,7 @@ public class AppSettings
                 InputSelector    = ".ProseMirror[contenteditable='true']",
                 SubmitSelector   = "[aria-label='Send message']",
                 ResponseSelector = ".font-claude-message",
+                UseCtrlEnter     = true,
             },
             new()
             {
