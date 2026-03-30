@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DupeFinderPro.Domain.Interfaces;
 using DupeFinderPro.Domain.Models;
 
@@ -11,69 +12,66 @@ public sealed class FileScanner : IFileScanner
         @"\AppData\Local\Temp\", @"\$RECYCLE.BIN\", @"\System Volume Information\"
     ];
 
-    public async Task<IReadOnlyList<FileEntry>> ScanAsync(
+    public async IAsyncEnumerable<FileEntry> ScanAsync(
         ScanFilter filter,
         IProgress<ScanProgress> progress,
-        CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var results = new List<FileEntry>();
         var allowedExtensions = filter.GetAllowedExtensions();
+        var excludedSegments = filter.ExcludePaths.Select(p => p.TrimEnd('\\', '/')).ToList();
+        int count = 0;
 
-        var excludedSegments = filter.ExcludePaths
-            .Select(p => p.TrimEnd('\\', '/'))
-            .ToList();
+        var paths = filter.IncludePaths
+            .Select((p, i) => (Path: p, Priority: i))
+            .Where(x => Directory.Exists(x.Path));
 
-        await Task.Run(() =>
+        foreach (var (path, priority) in paths)
         {
-            var paths = filter.IncludePaths
-                .Select((p, i) => (Path: p, Priority: i))
-                .Where(x => Directory.Exists(x.Path))
-                .ToList();
-
-            foreach (var (path, priority) in paths)
+            var options = new EnumerationOptions
             {
-                var options = new EnumerationOptions
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = filter.Recursive,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+
+            using var enumerator = Directory.EnumerateFiles(path, "*", options).GetEnumerator();
+            bool hasNext = true;
+
+            while (hasNext)
+            {
+                ct.ThrowIfCancellationRequested();
+                string filePath = string.Empty;
+
+                try
                 {
-                    IgnoreInaccessible = true,
-                    RecurseSubdirectories = filter.Recursive,
-                    AttributesToSkip = FileAttributes.ReparsePoint
-                };
-
-                var enumerator = Directory.EnumerateFiles(path, "*", options);
-
-                foreach (var filePath in enumerator)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    try
-                    {
-                        var info = new FileInfo(filePath);
-
-                        if (!PassesFilter(filePath, info, filter, allowedExtensions, excludedSegments))
-                            continue;
-
-                        results.Add(new FileEntry(
-                            FullPath: filePath,
-                            FileName: info.Name,
-                            SizeBytes: info.Length,
-                            LastModified: info.LastWriteTime,
-                            CreatedAt: info.CreationTime,
-                            SourcePriority: priority));
-
-                        if (results.Count % 100 == 0)
-                            progress.Report(new ScanProgress(ScanPhase.Collecting, results.Count, 0, 0, filePath));
-                    }
-                    catch
-                    {
-                        // skip inaccessible files
-                    }
+                    hasNext = enumerator.MoveNext();
+                    if (hasNext) filePath = enumerator.Current;
                 }
+                catch { continue; } // 접근 불가 폴더/파일 무시
+
+                if (!hasNext) break;
+
+                var info = new FileInfo(filePath);
+                if (!PassesFilter(filePath, info, filter, allowedExtensions, excludedSegments))
+                    continue;
+
+                var entry = new FileEntry(
+                    FullPath: filePath,
+                    FileName: info.Name,
+                    SizeBytes: info.Length,
+                    LastModified: info.LastWriteTime,
+                    CreatedAt: info.CreationTime,
+                    SourcePriority: priority);
+
+                count++;
+                if (count % 100 == 0)
+                    progress.Report(new ScanProgress(ScanPhase.Collecting, count, 0, 0, filePath));
+
+                yield return entry; // 리스트에 담지 않고 즉시 반환
             }
+        }
 
-            progress.Report(new ScanProgress(ScanPhase.Collecting, results.Count, results.Count, 0));
-        }, ct);
-
-        return results;
+        progress.Report(new ScanProgress(ScanPhase.Collecting, count, count, 0));
     }
 
     private static bool PassesFilter(

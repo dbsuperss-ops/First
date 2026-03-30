@@ -95,7 +95,7 @@ public class AppSettings
                 SiteUrl          = "https://copilot.microsoft.com",
                 InputSelector    = "textarea",
                 SubmitSelector   = "[aria-label='Submit']",
-                ResponseSelector = ".ac-container",
+                ResponseSelector = ".cib-message, [class*='message-content'], [class*='response-message']",
             },
         ]
     };

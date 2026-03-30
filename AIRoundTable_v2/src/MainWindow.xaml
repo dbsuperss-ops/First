@@ -4,24 +4,24 @@
         xmlns:local="clr-namespace:AIRoundTable"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="AI 백분토론 — The Digital Agora"
-        Height="900" Width="1440"
-        MinHeight="620" MinWidth="960"
+        Height="900" Width="1600"
+        MinHeight="620" MinWidth="1100"
         WindowStartupLocation="CenterScreen"
         Background="#F8FAFC"
         FontFamily="맑은 고딕">
 
     <Window.Resources>
         <!-- ── 브러시 ─────────────────────────────────────────────────────── -->
-        <SolidColorBrush x:Key="PrimaryBrush"     Color="#3B82F6"/>
-        <SolidColorBrush x:Key="PrimaryDarkBrush" Color="#2563EB"/>
+        <SolidColorBrush x:Key="PrimaryBrush"      Color="#3B82F6"/>
+        <SolidColorBrush x:Key="PrimaryDarkBrush"  Color="#2563EB"/>
         <SolidColorBrush x:Key="PrimaryLightBrush" Color="#EFF6FF"/>
-        <SolidColorBrush x:Key="AccentBrush"      Color="#10B981"/>
-        <SolidColorBrush x:Key="BorderBrush"      Color="#E2E8F0"/>
-        <SolidColorBrush x:Key="TextPrimary"      Color="#0F172A"/>
-        <SolidColorBrush x:Key="TextSecondary"    Color="#64748B"/>
-        <SolidColorBrush x:Key="TextMuted"        Color="#94A3B8"/>
-        <SolidColorBrush x:Key="SurfaceBrush"     Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="BgBrush"          Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="AccentBrush"       Color="#10B981"/>
+        <SolidColorBrush x:Key="BorderBrush"       Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="TextPrimary"       Color="#0F172A"/>
+        <SolidColorBrush x:Key="TextSecondary"     Color="#64748B"/>
+        <SolidColorBrush x:Key="TextMuted"         Color="#94A3B8"/>
+        <SolidColorBrush x:Key="SurfaceBrush"      Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="BgBrush"           Color="#F8FAFC"/>
 
         <!-- ── 사이드바 네비게이션 버튼 ──────────────────────────────────── -->
         <Style x:Key="NavButtonStyle" TargetType="Button">
@@ -38,8 +38,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="8"
-                                Margin="8,1"
+                                CornerRadius="8" Margin="8,1"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"/>
@@ -56,9 +55,9 @@
 
         <Style x:Key="NavActiveButtonStyle" TargetType="Button"
                BasedOn="{StaticResource NavButtonStyle}">
-            <Setter Property="Background"  Value="#1E293B"/>
-            <Setter Property="Foreground"  Value="#FFFFFF"/>
-            <Setter Property="FontWeight"  Value="SemiBold"/>
+            <Setter Property="Background" Value="#1E293B"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
         <!-- ── 아웃라인 버튼 ─────────────────────────────────────────────── -->
@@ -158,11 +157,79 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- ── 창 수 선택 버튼 ──────────────────────────────────────────── -->
+        <Style x:Key="CountBtnStyle" TargetType="Button">
+            <Setter Property="Background"      Value="Transparent"/>
+            <Setter Property="Foreground"      Value="#94A3B8"/>
+            <Setter Property="BorderBrush"     Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width"           Value="26"/>
+            <Setter Property="Height"          Value="22"/>
+            <Setter Property="FontSize"        Value="11"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="FontFamily"      Value="맑은 고딕"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#334155"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── 브라우저 액션 버튼 (초록) ──────────────────────────────────── -->
+        <Style x:Key="AccentButtonStyle" TargetType="Button">
+            <Setter Property="Background"      Value="#10B981"/>
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize"        Value="12"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="FontFamily"      Value="맑은 고딕"/>
+            <Setter Property="Padding"         Value="10,7"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#059669"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#047857"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Background" Value="#D1FAE5"/>
+                                <Setter Property="Foreground" Value="#6EE7B7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="190"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -171,21 +238,16 @@
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <Border Grid.Column="0" Background="#0F172A">
             <DockPanel>
-
-                <!-- 로고 영역 -->
                 <StackPanel DockPanel.Dock="Top" Margin="20,24,20,0">
                     <TextBlock Text="THE AGORA"
                                Foreground="#60A5FA" FontSize="9" FontWeight="Bold"/>
                     <TextBlock Text="AI DEBATE STAGE"
-                               Foreground="#94A3B8" FontSize="12"
-                               Margin="0,3,0,0"/>
+                               Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
                 </StackPanel>
 
-                <!-- 구분선 -->
                 <Border DockPanel.Dock="Top"
                         Height="1" Background="#1E293B" Margin="16,18,16,6"/>
 
-                <!-- 네비게이션 -->
                 <StackPanel DockPanel.Dock="Top">
                     <Button Content="📊  토론 현황"
                             Style="{StaticResource NavActiveButtonStyle}"/>
@@ -220,20 +282,17 @@
                             Click="NewSession_Click"/>
                 </Border>
 
-                <!-- 여백 채우기 -->
                 <Grid/>
             </DockPanel>
         </Border>
 
         <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!-- 메인 영역 (3열 토론 + 브라우저 + 입력)                              -->
+        <!-- 메인 영역                                                          -->
         <!-- ══════════════════════════════════════════════════════════════════ -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>  <!-- 상단 헤더 -->
+                <RowDefinition Height="*"/>      <!-- 메인 콘텐츠 (브라우저+토론창+입력창) -->
             </Grid.RowDefinitions>
 
             <!-- ── 상단 헤더 ─────────────────────────────────────────────── -->
@@ -258,10 +317,6 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal"
                                 HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Button Content="⧉"
-                                Style="{StaticResource OutlineButtonStyle}"
-                                Width="32" Height="32" Padding="0"
-                                Margin="0,0,6,0"/>
                         <Button Content="⚙"
                                 Style="{StaticResource OutlineButtonStyle}"
                                 Width="32" Height="32" Padding="0"
@@ -274,30 +329,73 @@
                 </Grid>
             </Border>
 
-            <!-- ── 3열 토론 영역 ──────────────────────────────────────────── -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
+            <!-- 3열 레이아웃: [왼쪽 브라우저] | [중앙 토론창+입력창] | [오른쪽 브라우저] -->
+            <!-- 브라우저 패널은 전체 높이를 차지 / 입력창은 중앙 열 하단에 위치 -->
+            <!-- ══════════════════════════════════════════════════════════════ -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="230"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="230"/>
+                    <ColumnDefinition Width="*"/>       <!-- 왼쪽 AI 브라우저 -->
+                    <ColumnDefinition Width="5"/>       <!-- 리사이즈 핸들 -->
+                    <ColumnDefinition Width="380"/>     <!-- 중앙 토론창 -->
+                    <ColumnDefinition Width="5"/>       <!-- 리사이즈 핸들 -->
+                    <ColumnDefinition Width="*"/>       <!-- 오른쪽 AI 브라우저 -->
                 </Grid.ColumnDefinitions>
 
-                <!-- 왼쪽 AI 패널 열 -->
-                <Border Grid.Column="0"
-                        Background="{StaticResource BgBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="0,0,1,0">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel x:Name="_leftAiPanels" Margin="10,14,10,14"/>
-                    </ScrollViewer>
-                </Border>
-
-                <!-- 중앙 토론 창 -->
-                <Grid Grid.Column="1" Background="{StaticResource SurfaceBrush}">
+                <!-- ── 왼쪽 AI 브라우저 패널 ─────────────────────────────── -->
+                <Grid Grid.Column="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 패널 헤더 + 창 수 선택 -->
+                    <Border Grid.Row="0" Background="#1E293B" Padding="12,9">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        Background="#10B981" VerticalAlignment="Center"
+                                        Margin="0,0,8,0"/>
+                                <TextBlock Text="왼쪽 AI 브라우저"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <TextBlock Text="창 수"
+                                           Foreground="#94A3B8" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <Button x:Name="_leftCount1Btn" Content="1" Tag="L1"
+                                        Click="PanelCount_Click"
+                                        Style="{StaticResource CountBtnStyle}" Margin="0,0,3,0"/>
+                                <Button x:Name="_leftCount2Btn" Content="2" Tag="L2"
+                                        Click="PanelCount_Click"
+                                        Style="{StaticResource CountBtnStyle}" Margin="0,0,3,0"/>
+                                <Button x:Name="_leftCount3Btn" Content="3" Tag="L3"
+                                        Click="PanelCount_Click"
+                                        Style="{StaticResource CountBtnStyle}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 동적 브라우저 슬롯 영역 (전체 높이) -->
+                    <Grid x:Name="_leftBrowserArea" Grid.Row="1"/>
+                </Grid>
+
+                <!-- 좌측 리사이즈 핸들 -->
+                <GridSplitter Grid.Column="1"
+                              Width="5"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              Background="{StaticResource BorderBrush}"
+                              ResizeBehavior="PreviousAndNext"/>
+
+                <!-- ── 중앙 토론창 + 입력창 ────────────────────────────────── -->
+                <Grid Grid.Column="2" Background="{StaticResource SurfaceBrush}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>  <!-- 헤더 -->
+                        <RowDefinition Height="*"/>      <!-- 메시지 목록 -->
+                        <RowDefinition Height="Auto"/>  <!-- 입력창 -->
                     </Grid.RowDefinitions>
 
                     <!-- 중앙 열 헤더 -->
@@ -305,12 +403,14 @@
                             Background="{StaticResource SurfaceBrush}"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="0,0,0,1"
-                            Padding="20,13">
+                            Padding="16,13">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="🎙️" FontSize="14" VerticalAlignment="Center"
+                                           Margin="0,0,6,0"/>
                                 <TextBlock Text="메인 토론창"
                                            Foreground="{StaticResource TextPrimary}"
-                                           FontSize="14" FontWeight="SemiBold"
+                                           FontSize="13" FontWeight="SemiBold"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal"
@@ -319,16 +419,16 @@
                                            Text="0개 메시지"
                                            Foreground="{StaticResource TextMuted}"
                                            FontSize="11" VerticalAlignment="Center"
-                                           Margin="0,0,10,0"/>
+                                           Margin="0,0,8,0"/>
                                 <Button Content="저장"
                                         Style="{StaticResource OutlineButtonStyle}"
                                         Click="SaveLog_Click"
-                                        Margin="0,0,12,0"/>
-                                <Border Width="8" Height="8" CornerRadius="4"
+                                        Margin="0,0,8,0"/>
+                                <Border Width="7" Height="7" CornerRadius="4"
                                         Background="#EF4444" VerticalAlignment="Center"/>
                                 <TextBlock Text="LIVE"
                                            Foreground="#EF4444" FontSize="9" FontWeight="Bold"
-                                           VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -342,7 +442,7 @@
                         <ItemsControl x:Name="_messageList" Padding="0,10,0,20">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type local:MessageViewModel}">
-                                    <StackPanel Margin="20,8,20,0">
+                                    <StackPanel Margin="14,6,14,0">
                                         <StackPanel.ContextMenu>
                                             <ContextMenu>
                                                 <MenuItem Header="📋  복사"
@@ -355,15 +455,14 @@
                                         </StackPanel.ContextMenu>
 
                                         <!-- 타임스탬프 + 발신자 배지 -->
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                             <TextBlock Text="{Binding TimestampText}"
-                                                       FontSize="11"
+                                                       FontSize="10"
                                                        Foreground="{StaticResource TextMuted}"
                                                        VerticalAlignment="Center"
-                                                       Margin="0,0,8,0"/>
+                                                       Margin="0,0,7,0"/>
                                             <Border Background="{Binding AvatarBrush}"
-                                                    CornerRadius="4"
-                                                    Padding="6,2"
+                                                    CornerRadius="4" Padding="5,2"
                                                     VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Sender}"
                                                            Foreground="White"
@@ -372,16 +471,15 @@
                                         </StackPanel>
 
                                         <!-- 메시지 말풍선 -->
-                                        <Border CornerRadius="4,12,12,12"
-                                                Padding="12,9"
+                                        <Border CornerRadius="4,10,10,10"
+                                                Padding="11,8"
                                                 Background="{Binding CardBackground}"
                                                 BorderBrush="{Binding CardBorderBrush}"
                                                 BorderThickness="1"
-                                                MaxWidth="600"
-                                                HorizontalAlignment="Left">
+                                                HorizontalAlignment="Stretch">
                                             <TextBlock Text="{Binding Content}"
                                                        TextWrapping="Wrap"
-                                                       FontSize="13" LineHeight="21"
+                                                       FontSize="12" LineHeight="20"
                                                        Foreground="#374151"/>
                                         </Border>
                                     </StackPanel>
@@ -398,130 +496,138 @@
                             Background="#EFF6FF"
                             BorderBrush="#BFDBFE"
                             BorderThickness="0,0,0,1"
-                            Padding="16,7">
+                            Padding="14,7">
                         <TextBlock x:Name="_thinkingText"
-                                   Text="⏳  AI 모델 응답 대기 중..."
-                                   FontSize="12" Foreground="#1D4ED8"/>
+                                   Text="⏳  AI 응답 대기 중..."
+                                   FontSize="11" Foreground="#1D4ED8"/>
                     </Border>
-                </Grid>
 
-                <!-- 오른쪽 AI 패널 열 -->
-                <Border Grid.Column="2"
-                        Background="{StaticResource BgBrush}"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        BorderThickness="1,0,0,0">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel x:Name="_rightAiPanels" Margin="10,14,10,14"/>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
-
-            <!-- ── 브라우저 패널 (접이식) ─────────────────────────────────── -->
-            <Expander x:Name="_browserExpander"
-                      Grid.Row="2"
-                      Header="🌐  브라우저 패널 (AI 사이트 로그인 후 자동화 가능)"
-                      IsExpanded="False"
-                      Visibility="Collapsed"
-                      Background="{StaticResource SurfaceBrush}"
-                      BorderBrush="{StaticResource BorderBrush}"
-                      BorderThickness="0,1,0,0">
-                <TabControl x:Name="_browserTabControl"
-                            Height="300"
-                            BorderThickness="0"
-                            Background="{StaticResource BgBrush}"
-                            Padding="0"/>
-            </Expander>
-
-            <!-- ── 입력 영역 (사회자) ──────────────────────────────────────── -->
-            <Border Grid.Row="3"
-                    Background="{StaticResource SurfaceBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="0,1,0,0"
-                    Padding="16,12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- 사회자 아이콘 + 라벨 -->
-                    <StackPanel Grid.Column="0"
-                                VerticalAlignment="Bottom"
-                                Margin="0,0,12,2"
-                                HorizontalAlignment="Center">
-                        <Border Width="42" Height="42" CornerRadius="21"
-                                Background="{StaticResource PrimaryLightBrush}"
-                                HorizontalAlignment="Center">
-                            <TextBlock Text="🎙️" FontSize="18"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="사회자"
-                                   FontSize="10" FontWeight="SemiBold"
-                                   Foreground="{StaticResource TextSecondary}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,3,0,0"/>
-                    </StackPanel>
-
-                    <!-- 텍스트 입력 -->
-                    <Border Grid.Column="1"
-                            CornerRadius="12"
+                    <!-- ── 입력 영역 (사회자) — 중앙 열 하단 ────────────────── -->
+                    <Border Grid.Row="2"
+                            Background="{StaticResource SurfaceBrush}"
                             BorderBrush="{StaticResource BorderBrush}"
-                            BorderThickness="1"
-                            Background="{StaticResource BgBrush}"
-                            Margin="0,0,10,0"
-                            MinHeight="46">
-                        <Grid VerticalAlignment="Center">
+                            BorderThickness="0,1,0,0"
+                            Padding="12,10">
+                        <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox x:Name="_inputTextBox"
-                                     Grid.Column="0"
-                                     BorderThickness="0"
-                                     Background="Transparent"
-                                     Padding="14,10"
-                                     FontSize="13"
-                                     FontFamily="맑은 고딕"
-                                     Foreground="#374151"
-                                     VerticalContentAlignment="Center"
-                                     AcceptsReturn="True"
-                                     TextWrapping="Wrap"
-                                     MaxHeight="120"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     TextChanged="InputTextBox_TextChanged"
-                                     KeyDown="InputTextBox_KeyDown"/>
-                            <TextBlock x:Name="_placeholder"
-                                       Grid.Column="0"
-                                       Text="주제 또는 질문을 입력하세요. @모델명 으로 특정 모델 지목 가능"
-                                       IsHitTestVisible="False"
-                                       Foreground="{StaticResource TextMuted}"
-                                       FontSize="12"
-                                       Margin="14,0,0,0"
-                                       VerticalAlignment="Center"/>
-                            <Button Grid.Column="1"
-                                    Content="📎"
-                                    FontSize="16"
-                                    Background="Transparent"
-                                    BorderThickness="0"
-                                    Cursor="Hand"
-                                    Padding="10,0"
-                                    VerticalAlignment="Center"
-                                    Foreground="{StaticResource TextMuted}"/>
+
+                            <!-- 사회자 아이콘 -->
+                            <StackPanel Grid.Column="0"
+                                        VerticalAlignment="Bottom"
+                                        Margin="0,0,10,2"
+                                        HorizontalAlignment="Center">
+                                <Border Width="36" Height="36" CornerRadius="18"
+                                        Background="{StaticResource PrimaryLightBrush}"
+                                        HorizontalAlignment="Center">
+                                    <TextBlock Text="🎙️" FontSize="15"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="사회자"
+                                           FontSize="9" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+
+                            <!-- 텍스트 입력 -->
+                            <Border Grid.Column="1"
+                                    CornerRadius="10"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1"
+                                    Background="{StaticResource BgBrush}"
+                                    Margin="0,0,8,0"
+                                    MinHeight="42">
+                                <Grid VerticalAlignment="Center">
+                                    <TextBox x:Name="_inputTextBox"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             Padding="12,8"
+                                             FontSize="12"
+                                             FontFamily="맑은 고딕"
+                                             Foreground="#374151"
+                                             VerticalContentAlignment="Center"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             MaxHeight="100"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             TextChanged="InputTextBox_TextChanged"
+                                             KeyDown="InputTextBox_KeyDown"/>
+                                    <TextBlock x:Name="_placeholder"
+                                               Text="토론 주제나 질문을 입력하세요"
+                                               IsHitTestVisible="False"
+                                               Foreground="{StaticResource TextMuted}"
+                                               FontSize="12"
+                                               Margin="12,0,0,0"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- 전송 버튼 -->
+                            <Button Grid.Column="2"
+                                    x:Name="_sendBtn"
+                                    Style="{StaticResource SendButtonStyle}"
+                                    Click="Send_Click"
+                                    VerticalAlignment="Bottom"
+                                    Height="42"
+                                    MinWidth="72"
+                                    Content="전송 ▷"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- 우측 리사이즈 핸들 -->
+                <GridSplitter Grid.Column="3"
+                              Width="5"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              Background="{StaticResource BorderBrush}"
+                              ResizeBehavior="PreviousAndNext"/>
+
+                <!-- ── 오른쪽 AI 브라우저 패널 ──────────────────────────── -->
+                <Grid Grid.Column="4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 패널 헤더 + 창 수 선택 -->
+                    <Border Grid.Row="0" Background="#1E293B" Padding="12,9">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="8" Height="8" CornerRadius="4"
+                                        Background="#F59E0B" VerticalAlignment="Center"
+                                        Margin="0,0,8,0"/>
+                                <TextBlock Text="오른쪽 AI 브라우저"
+                                           Foreground="White" FontSize="13"
+                                           FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal"
+                                        HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <TextBlock Text="창 수"
+                                           Foreground="#94A3B8" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <Button x:Name="_rightCount1Btn" Content="1" Tag="R1"
+                                        Click="PanelCount_Click"
+                                        Style="{StaticResource CountBtnStyle}" Margin="0,0,3,0"/>
+                                <Button x:Name="_rightCount2Btn" Content="2" Tag="R2"
+                                        Click="PanelCount_Click"
+                                        Style="{StaticResource CountBtnStyle}" Margin="0,0,3,0"/>
+                                <Button x:Name="_rightCount3Btn" Content="3" Tag="R3"
+                                        Click="PanelCount_Click"
+                                        Style="{StaticResource CountBtnStyle}"/>
+                            </StackPanel>
                         </Grid>
                     </Border>
 
-                    <!-- 전송 버튼 -->
-                    <Button Grid.Column="2"
-                            x:Name="_sendBtn"
-                            Style="{StaticResource SendButtonStyle}"
-                            Click="Send_Click"
-                            VerticalAlignment="Bottom"
-                            Content="전송 ▷"/>
+                    <!-- 동적 브라우저 슬롯 영역 (전체 높이) -->
+                    <Grid x:Name="_rightBrowserArea" Grid.Row="1"/>
                 </Grid>
-            </Border>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

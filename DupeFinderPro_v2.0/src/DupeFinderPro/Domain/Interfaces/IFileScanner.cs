@@ -1,10 +1,12 @@
+using System.Collections.Generic;
+using System.Threading;
 using DupeFinderPro.Domain.Models;
 
 namespace DupeFinderPro.Domain.Interfaces;
 
 public interface IFileScanner
 {
-    Task<IReadOnlyList<FileEntry>> ScanAsync(
+    IAsyncEnumerable<FileEntry> ScanAsync(
         ScanFilter filter,
         IProgress<ScanProgress> progress,
         CancellationToken ct = default);

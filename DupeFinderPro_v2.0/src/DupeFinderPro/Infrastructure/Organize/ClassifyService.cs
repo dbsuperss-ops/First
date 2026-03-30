@@ -132,8 +132,11 @@ public sealed class ClassifyService : IClassifyService
         int count = 0;
         var batchId = Guid.NewGuid();
         var logs = new List<OrganizeLogEntry>();
-        var movedFrom = new HashSet<string>();
         var fileMoves = new List<FileMove>();
+        var movedFrom = new HashSet<string>();
+        
+        // 롤백을 위한 스택 추가
+        var rollbackStack = new Stack<(string Original, string New)>(); 
 
         foreach (var r in results)
         {
@@ -141,8 +144,7 @@ public sealed class ClassifyService : IClassifyService
             try
             {
                 var fiAttr = new FileInfo(r.SourcePath);
-                if (!fiAttr.Exists) continue;
-                if (scenario.ExcludeSystemFiles && IsSystemFile(fiAttr, r.SourcePath)) continue;
+                if (!fiAttr.Exists || (scenario.ExcludeSystemFiles && IsSystemFile(fiAttr, r.SourcePath))) continue;
 
                 var dir = Path.GetDirectoryName(r.TargetPath);
                 if (dir == null) continue;
@@ -155,29 +157,43 @@ public sealed class ClassifyService : IClassifyService
                     File.Delete(finalTarget);
 
                 File.Move(r.SourcePath, finalTarget);
-                count++;
-                progress?.Report(count);
-                movedFrom.Add(Path.GetDirectoryName(r.SourcePath) ?? "");
+                rollbackStack.Push((r.SourcePath, finalTarget)); // 성공 시 롤백 스택에 기록
 
                 logs.Add(new OrganizeLogEntry(batchId, DateTime.Now, Path.GetFileName(finalTarget), r.SourcePath, finalTarget, "이동"));
                 fileMoves.Add(new FileMove(r.SourcePath, finalTarget, r.FileName, r.RuleName));
+                movedFrom.Add(Path.GetDirectoryName(r.SourcePath) ?? "");
+                
+                count++;
+                progress?.Report(count);
             }
-            catch { /* skip files that fail to move */ }
+            catch { /* 개별 이동 실패는 건너뜀 */ }
         }
 
-        if (logs.Count > 0) _logRepo.AddRange(logs);
+        if (count == 0) return 0;
 
-        if (count > 0)
+        // 유사 트랜잭션(Pseudo-transaction) 커밋 시도
+        bool logSaved = _logRepo.AddRange(logs);
+        bool recordSaved = false;
+
+        if (logSaved)
         {
-            long totalBytes = fileMoves.Select(f =>
-            {
-                try { return new FileInfo(f.NewPath).Length; } catch { return 0L; }
-            }).Sum();
-
-            _recordRepo.Add(new ClassifyRecord(Guid.NewGuid(), DateTime.Now, scenario.Name,
+            long totalBytes = fileMoves.Select(f => { try { return new FileInfo(f.NewPath).Length; } catch { return 0L; } }).Sum();
+            recordSaved = _recordRepo.Add(new ClassifyRecord(Guid.NewGuid(), DateTime.Now, scenario.Name,
                 scenario.SourceFolder, scenario.TargetFolder, count, totalBytes, fileMoves));
         }
 
+        // 커밋 실패 시 롤백 (파일 원상 복구)
+        if (!logSaved || !recordSaved)
+        {
+            while (rollbackStack.Count > 0)
+            {
+                var item = rollbackStack.Pop();
+                try { File.Move(item.New, item.Original); } catch { /* 롤백 중 오류 무시 */ }
+            }
+            return 0; // 실패 처리
+        }
+
+        // 모든 저장이 성공한 후에만 빈 폴더 정리 수행
         if (scenario.CleanupEmptyFolders)
         {
             foreach (var folder in movedFrom.Where(f => !string.IsNullOrEmpty(f)))

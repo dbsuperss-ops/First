@@ -1,27 +1,31 @@
+using System.IO.Hashing;
 using System.Security.Cryptography;
 using DupeFinderPro.Domain.Interfaces;
+using DupeFinderPro.Domain.Models;
+using Microsoft.Extensions.Options;
 
 namespace DupeFinderPro.Infrastructure.Hashing;
 
 public sealed class HashingService : IHashingService
 {
-    private const int PartialReadBytes = 4096;
+    private readonly int _bufferSize;
+    public HashingService(IOptions<DupeFinderOptions> options) => _bufferSize = options.Value.PartialHashBytes > 0 ? options.Value.PartialHashBytes : 4096;
 
     public async Task<string> ComputePartialHashAsync(string filePath, CancellationToken ct = default)
     {
-        using var sha = SHA256.Create();
-        await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, PartialReadBytes, useAsync: true);
-        var buffer = new byte[PartialReadBytes];
-        // ReadAsync는 요청한 바이트 수를 한 번에 반환하지 않을 수 있으므로
-        // EOF에 도달할 때까지 버퍼를 채운다
+        await using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _bufferSize, useAsync: true);
+        var buffer = new byte[_bufferSize];
+        
         int totalRead = 0;
-        while (totalRead < PartialReadBytes)
+        while (totalRead < _bufferSize)
         {
-            int read = await fs.ReadAsync(buffer.AsMemory(totalRead, PartialReadBytes - totalRead), ct);
+            int read = await fs.ReadAsync(buffer.AsMemory(totalRead, _bufferSize - totalRead), ct);
             if (read == 0) break;
             totalRead += read;
         }
-        var hash = sha.ComputeHash(buffer, 0, totalRead);
+
+        // System.IO.Hashing의 초고속 알고리즘 적용
+        var hash = XxHash64.Hash(buffer.AsSpan(0, totalRead));
         return Convert.ToHexString(hash);
     }
 
