@@ -123,7 +123,7 @@ def fill_맞춤형(template_wb, students, 과목, 요일, start_date, end_date, 
     강사 = students[0]['강사']
 
     ws.cell(3, 6).value = f'초1~2 맞춤형 {과목}({요일}) 프로그램 {학년_label(students)} 출석부'
-    ws.cell(5, 4).value = f'{start_date.strftime("%Y. %-m. %-d.")}~{end_date.strftime("%Y. %-m. %-d.")}'
+    ws.cell(5, 4).value = f'{start_date.year}. {start_date.month}. {start_date.day}.~{end_date.year}. {end_date.month}. {end_date.day}.'
     ws.cell(6, 9).value = f'{강사}  (인)'
 
     for i, d in enumerate(dates[:len(CUSTOM_DATE_COLS)]):
@@ -153,7 +153,7 @@ def fill_방과후_single(template_wb, students, 과목, 요일, dates,
     강사 = students[0]['강사']
 
     ws.cell(2, 6).value  = f' {과목}({학년_label(students)}) 1학기 출석부'
-    ws.cell(4, 4).value  = f'{month_start.strftime("%Y. %-m. %-d.")}~\n{month_end.strftime("%Y. %-m. %-d.")}'
+    ws.cell(4, 4).value  = f'{month_start.year}. {month_start.month}. {month_start.day}.~\n{month_end.year}. {month_end.month}. {month_end.day}.'
     ws.cell(4, 10).value = f'{요일}요일 강사'
     ws.cell(5, 10).value = f'{강사}  (인)'
 

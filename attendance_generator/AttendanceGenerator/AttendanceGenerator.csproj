@@ -3,19 +3,12 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
-    <AssemblyName>출석부생성기</AssemblyName>
+    <AssemblyName>출석부관리</AssemblyName>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MaterialDesignThemes" Version="5.1.0" />
-  </ItemGroup>
-
-  <!-- engine.py와 출석부_TEMP.xlsx를 출력 폴더에 함께 복사 -->
-  <ItemGroup>
-    <Content Include="engine.py">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 </Project>
