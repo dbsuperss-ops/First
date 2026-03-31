@@ -17,3 +17,8 @@
 
 # Installer outputs
 **/installer/Output/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
