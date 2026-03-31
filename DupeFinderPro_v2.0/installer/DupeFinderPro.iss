@@ -44,6 +44,10 @@ Name: "startmenuicon"; Description: "시작 메뉴에 바로 가기 만들기"; 
 [Files]
 Source: "..\publish\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\publish\DupeFinderPro.pdb"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\av_libglesv2.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\libHarfBuzzSharp.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\publish\libSkiaSharp.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\{#AppExeName}"

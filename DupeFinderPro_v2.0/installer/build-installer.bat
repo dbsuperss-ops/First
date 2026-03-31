@@ -35,7 +35,7 @@ echo.
 if not exist "..\publish\DupeFinderPro.exe" (
     echo [오류] publish\DupeFinderPro.exe 가 없습니다.
     echo 먼저 dotnet publish 를 실행하세요:
-    echo   dotnet publish src\DupeFinderPro\DupeFinderPro.csproj -c Release -r win-x64 --self-contained true -o publish
+    echo   dotnet publish src\DupeFinderPro\DupeFinderPro.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
     echo.
     pause
     exit /b 1

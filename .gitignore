@@ -1,0 +1,19 @@
+# Ignore build and publish outputs
+**/bin/
+**/obj/
+**/publish/
+**/dist/
+
+# Ignore WebView2 user data folders
+**/*.exe.WebView2/
+**/EBWebView/
+
+# General .NET ignores
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Installer outputs
+**/installer/Output/
