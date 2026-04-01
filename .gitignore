@@ -22,3 +22,12 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Large binaries (GitHub 100MB limit)
+*.exe
+*.onnx
+*.zst
+**/release/
+**/installer/staging/
+extensions/
+TotalCode_All.txt
