@@ -51,17 +51,17 @@
 
         <!-- ── Accent primary button ──────────────────────────────── -->
         <Style Selector="Button.primary">
-            <Setter Property="Background"  Value="{StaticResource AccentTealBrush}"/>
-            <Setter Property="Foreground"  Value="White"/>
+            <Style.Resources>
+                <SolidColorBrush x:Key="ButtonBackground"             Color="{StaticResource AccentTeal}"/>
+                <SolidColorBrush x:Key="ButtonBackgroundPointerOver"  Color="{StaticResource AccentTealDark}"/>
+                <SolidColorBrush x:Key="ButtonBackgroundPressed"      Color="{StaticResource AccentTealDark}"/>
+                <SolidColorBrush x:Key="ButtonForeground"             Color="White"/>
+                <SolidColorBrush x:Key="ButtonForegroundPointerOver"  Color="White"/>
+                <SolidColorBrush x:Key="ButtonForegroundPressed"      Color="White"/>
+            </Style.Resources>
             <Setter Property="Padding"     Value="16 10"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="FontWeight"  Value="SemiBold"/>
-        </Style>
-        <Style Selector="Button.primary /template/ ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource AccentTealBrush}"/>
-        </Style>
-        <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource AccentTealDarkBrush}"/>
         </Style>
 
         <!-- ── Secondary / outline button ────────────────────────── -->
