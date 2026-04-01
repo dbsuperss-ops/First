@@ -1,6 +1,4 @@
 using Avalonia;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using DupeFinderPro.Application;
@@ -45,14 +43,6 @@ public sealed partial class App : AvaloniaApp
     private static IServiceProvider BuildServices()
     {
         var sc = new ServiceCollection();
-
-        var config = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .Build();
-
-        sc.Configure<DupeFinderPro.Domain.Models.DupeFinderOptions>(config.GetSection(DupeFinderPro.Domain.Models.DupeFinderOptions.SectionName));
-        sc.AddLogging(b => { b.AddConfiguration(config.GetSection("Logging")); b.AddConsole(); });
 
         // ── Infrastructure: duplicate detection ──────────────────────────
         sc.AddSingleton<IHashingService,       HashingService>();
