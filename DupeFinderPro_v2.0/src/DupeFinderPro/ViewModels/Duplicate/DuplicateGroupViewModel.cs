@@ -10,14 +10,26 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
 {
     [ObservableProperty] private bool _isExpanded = true;
 
-    public string Hash          => Group.Hash[..Math.Min(8, Group.Hash.Length)] + "…";
-    public string FileCount     => $"{Group.Files.Count}개 파일";
-    public string WastedBytes   => FormatBytes(Group.WastedBytes);
-    public string ExpandIcon    => IsExpanded ? "▲" : "▼";
-    public string TotalSize     => FormatBytes(Group.SizeBytes * Group.Files.Count);
+    public string Hash        => Group.Hash[..Math.Min(8, Group.Hash.Length)] + "…";
+    public string FileCount   => $"{Group.Files.Count}개 파일";
+    public string WastedBytes => FormatBytes(Group.WastedBytes);
+    public string ExpandIcon  => IsExpanded ? "▲" : "▼";
+    public string TotalSize   => FormatBytes(Group.SizeBytes * Group.Files.Count);
     public DuplicateGroup Group { get; }
 
     public ObservableCollection<FileEntryViewModel> Files { get; }
+
+    // True when ALL files in the group are checked; setting it checks/unchecks all
+    public bool IsGroupChecked
+    {
+        get => Files.Count > 0 && Files.All(f => f.IsChecked);
+        set
+        {
+            foreach (var f in Files)
+                f.IsChecked = value;
+            OnPropertyChanged(nameof(IsGroupChecked));
+        }
+    }
 
     public DuplicateGroupViewModel(DuplicateGroup group, CleanupOrchestrator cleanup)
     {
@@ -26,13 +38,20 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
             group.Files.Select((f, i) =>
             {
                 var vm = new FileEntryViewModel(f, cleanup);
-                // Mark the suggested-keep file as Keep
                 if (group.SuggestedKeep?.FullPath == f.FullPath)
                     vm.SelectedAction = FileAction.Keep;
                 else if (i > 0)
                     vm.SelectedAction = FileAction.Delete;
                 return vm;
             }));
+
+        // Bubble file-level checkbox changes up to group checkbox
+        foreach (var vm in Files)
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(FileEntryViewModel.IsChecked))
+                    OnPropertyChanged(nameof(IsGroupChecked));
+            };
     }
 
     partial void OnIsExpandedChanged(bool value) => OnPropertyChanged(nameof(ExpandIcon));
@@ -58,9 +77,10 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
             file.SelectedAction = FileAction.Keep;
     }
 
-    public async Task ApplyAsync(string quarantinePath, string moveToPath, CancellationToken ct)
+    // Bulk apply — processes only checked, non-done files
+    public async Task ApplyCheckedAsync(string quarantinePath, string moveToPath, CancellationToken ct)
     {
-        foreach (var file in Files)
+        foreach (var file in Files.Where(f => f.IsChecked))
             await file.ApplyActionAsync(quarantinePath, moveToPath, ct);
     }
 

@@ -87,8 +87,15 @@ public sealed class DuplicateDetector : IDuplicateDetector
             {
                 try
                 {
-                    var hash = await hashFunc(item.f);
-                    results[item.i] = updater(item.f, hash);
+                    if (IsCloudOnlyFile(item.f.FullPath))
+                    {
+                        results[item.i] = item.f;
+                    }
+                    else
+                    {
+                        var hash = await hashFunc(item.f);
+                        results[item.i] = updater(item.f, hash);
+                    }
                 }
                 catch
                 {
@@ -101,5 +108,20 @@ public sealed class DuplicateDetector : IDuplicateDetector
             });
 
         return results.Where(f => f is not null).ToList();
+    }
+
+    private static bool IsCloudOnlyFile(string filePath)
+    {
+        try
+        {
+            var attrs = File.GetAttributes(filePath);
+            const FileAttributes offline = FileAttributes.Offline;
+            const int recallOnDataAccess = 0x400000; // FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
+            return (attrs & offline) != 0 || ((int)attrs & recallOnDataAccess) != 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

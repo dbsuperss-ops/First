@@ -4,7 +4,26 @@
              x:Class="DupeFinderPro.Views.Duplicate.DuplicateScanView"
              x:DataType="vm:DuplicateScanViewModel">
 
-    <ScrollViewer Padding="32 28">
+    <DockPanel>
+
+        <!-- ── 하단 고정 시작 버튼 ── -->
+        <Border DockPanel.Dock="Bottom"
+                Background="White"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0 1 0 0"
+                Padding="32 16">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Classes="primary" Content="🔍 스캔 시작"
+                        Command="{Binding StartScanCommand}"/>
+                <TextBlock Foreground="{StaticResource StatusRedBrush}"
+                           VerticalAlignment="Center"
+                           Text="{Binding ValidationError}"
+                           IsVisible="{Binding HasValidationError}"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Padding="32 28 32 40"
+                      VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="24">
 
             <!-- ── 헤더 ── -->
@@ -142,7 +161,7 @@
             </Border>
 
             <!-- ── 옵션 ── -->
-            <Border Classes="card">
+            <Border Classes="card" Margin="0 0 0 16">
                 <StackPanel Spacing="12">
                     <TextBlock Classes="section-title" Text="스캔 옵션"/>
                     <CheckBox Content="하위 폴더 포함 (재귀)" IsChecked="{Binding Recursive}"/>
@@ -164,19 +183,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- ── 유효성 오류 ── -->
-            <Border Classes="card" Background="#FFF3F3"
-                    IsVisible="{Binding HasValidationError}">
-                <TextBlock Foreground="{StaticResource StatusRedBrush}"
-                           Text="{Binding ValidationError}"
-                           TextWrapping="Wrap"/>
-            </Border>
-
-            <!-- ── 시작 버튼 ── -->
-            <Button Classes="primary" Content="🔍 스캔 시작"
-                    Command="{Binding StartScanCommand}"
-                    HorizontalAlignment="Left"/>
-
         </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+    </DockPanel>
 </UserControl>

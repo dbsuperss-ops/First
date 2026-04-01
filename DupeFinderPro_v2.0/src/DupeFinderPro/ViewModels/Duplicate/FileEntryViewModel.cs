@@ -15,19 +15,24 @@ public sealed partial class FileEntryViewModel : ObservableObject
     [ObservableProperty] private bool _isProcessing;
     [ObservableProperty] private bool _isDone;
     [ObservableProperty] private string _statusMessage = string.Empty;
+    [ObservableProperty] private bool _isChecked = true;
+
+    // Injected by ResultsViewModel; updated whenever the paths change
+    public string QuarantinePath { get; set; } = string.Empty;
+    public string MoveToPath     { get; set; } = string.Empty;
 
     public FileEntry Entry { get; }
 
-    public string FileName     => Entry.FileName;
-    public string FullPath     => Entry.FullPath;
+    public string FileName      => Entry.FileName;
+    public string FullPath      => Entry.FullPath;
     public string SizeFormatted => FormatBytes(Entry.SizeBytes);
-    public string LastModified => Entry.LastModified.ToString("g");
-    public string CreatedAt    => Entry.CreatedAt.ToString("g");
+    public string LastModified  => Entry.LastModified.ToString("g");
+    public string CreatedAt     => Entry.CreatedAt.ToString("g");
 
-    public bool IsKeep        => SelectedAction == FileAction.Keep;
+    public bool IsKeep         => SelectedAction == FileAction.Keep;
     public bool IsMoveToFolder => SelectedAction == FileAction.MoveToFolder;
-    public bool IsQuarantine  => SelectedAction == FileAction.Quarantine;
-    public bool IsDelete      => SelectedAction == FileAction.Delete;
+    public bool IsQuarantine   => SelectedAction == FileAction.Quarantine;
+    public bool IsDelete       => SelectedAction == FileAction.Delete;
 
     public FileEntryViewModel(FileEntry entry, CleanupOrchestrator cleanup)
     {
@@ -43,21 +48,47 @@ public sealed partial class FileEntryViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDelete));
     }
 
+    // ── Individual immediate-apply action commands ─────────────────────────
     [RelayCommand]
-    private void SetActionKeep()       => SelectedAction = FileAction.Keep;
+    private void SetActionKeep()
+    {
+        SelectedAction = FileAction.Keep;
+        IsDone = true;
+        StatusMessage = "유지됨";
+    }
 
     [RelayCommand]
-    private void SetActionMove()       => SelectedAction = FileAction.MoveToFolder;
+    private async Task SetActionMove()
+    {
+        SelectedAction = FileAction.MoveToFolder;
+        await ApplyActionAsync(QuarantinePath, MoveToPath, CancellationToken.None);
+    }
 
     [RelayCommand]
-    private void SetActionQuarantine() => SelectedAction = FileAction.Quarantine;
+    private async Task SetActionQuarantine()
+    {
+        SelectedAction = FileAction.Quarantine;
+        await ApplyActionAsync(QuarantinePath, MoveToPath, CancellationToken.None);
+    }
 
     [RelayCommand]
-    private void SetActionDelete()     => SelectedAction = FileAction.Delete;
+    private async Task SetActionDelete()
+    {
+        SelectedAction = FileAction.Delete;
+        await ApplyActionAsync(QuarantinePath, MoveToPath, CancellationToken.None);
+    }
 
+    // ── Bulk-apply path (called by DuplicateGroupViewModel.ApplyCheckedAsync) ──
     public async Task ApplyActionAsync(string quarantinePath, string moveToPath, CancellationToken ct)
     {
-        if (SelectedAction == FileAction.Keep || IsDone) return;
+        if (IsDone) return;
+
+        if (SelectedAction == FileAction.Keep)
+        {
+            IsDone = true;
+            StatusMessage = "유지됨";
+            return;
+        }
 
         IsProcessing = true;
         try
@@ -86,6 +117,13 @@ public sealed partial class FileEntryViewModel : ObservableObject
             IsProcessing = false;
         }
     }
+
+    // ── Preview helpers ────────────────────────────────────────────────────
+    private static readonly HashSet<string> ImageExtensions =
+        [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".tif", ".webp", ".ico"];
+
+    public static bool IsImageFile(string path) =>
+        ImageExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
 
     private static string FormatBytes(long bytes)
     {

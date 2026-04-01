@@ -1,3 +1,4 @@
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DupeFinderPro.Application;
@@ -39,6 +40,12 @@ public sealed partial class ResultsViewModel : ViewModelBase
     [ObservableProperty] private string _moveToPath = string.Empty;
     [ObservableProperty] private bool   _isApplying;
 
+    // ── Preview ───────────────────────────────────────────────────────────
+    [ObservableProperty] private FileEntryViewModel? _selectedFile;
+    [ObservableProperty] private Bitmap?             _previewBitmap;
+    [ObservableProperty] private bool                _isImagePreview;
+    [ObservableProperty] private bool                _hasSelectedFile;
+
     // ── Groups ────────────────────────────────────────────────────────────
     public ObservableCollection<DuplicateGroupViewModel> Groups { get; } = [];
 
@@ -62,6 +69,9 @@ public sealed partial class ResultsViewModel : ViewModelBase
         CurrentFile = string.Empty;
         ProgressValue = 0;
         IsIndeterminate = true;
+        SelectedFile = null;
+        PreviewBitmap = null;
+        HasSelectedFile = false;
 
         _cts = new CancellationTokenSource();
         _ = RunScanAsync(job, _cts.Token);
@@ -76,9 +86,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
         IsIndeterminate = false;
 
         if (job.Status == ScanJobStatus.Completed && job.Result is { } result)
-        {
             LoadResults(result);
-        }
         else if (job.Status == ScanJobStatus.Failed)
         {
             HasScanError = true;
@@ -120,17 +128,69 @@ public sealed partial class ResultsViewModel : ViewModelBase
 
         Groups.Clear();
         foreach (var g in result.DuplicateGroups.OrderByDescending(g => g.WastedBytes))
-            Groups.Add(new DuplicateGroupViewModel(g, _cleanup));
+        {
+            var groupVm = new DuplicateGroupViewModel(g, _cleanup);
+            SyncPathsToGroup(groupVm);
+            Groups.Add(groupVm);
+        }
 
         HasResults = TotalGroups > 0;
         IsEmpty    = TotalGroups == 0;
     }
 
-    [RelayCommand]
-    private void CancelScan()
+    private void SyncPathsToGroup(DuplicateGroupViewModel group)
     {
-        _cts?.Cancel();
+        foreach (var f in group.Files)
+        {
+            f.QuarantinePath = QuarantinePath;
+            f.MoveToPath     = MoveToPath;
+        }
     }
+
+    partial void OnQuarantinePathChanged(string value)
+    {
+        foreach (var g in Groups)
+            foreach (var f in g.Files)
+                f.QuarantinePath = value;
+    }
+
+    partial void OnMoveToPathChanged(string value)
+    {
+        foreach (var g in Groups)
+            foreach (var f in g.Files)
+                f.MoveToPath = value;
+    }
+
+    // ── Preview ───────────────────────────────────────────────────────────
+    [RelayCommand]
+    private async Task SelectFile(FileEntryViewModel file)
+    {
+        SelectedFile = file;
+        HasSelectedFile = true;
+        PreviewBitmap = null;
+        IsImagePreview = false;
+
+        if (FileEntryViewModel.IsImageFile(file.FullPath) && File.Exists(file.FullPath))
+        {
+            IsImagePreview = true;
+            try
+            {
+                PreviewBitmap = await Task.Run(() =>
+                {
+                    using var stream = File.OpenRead(file.FullPath);
+                    return new Bitmap(stream);
+                });
+            }
+            catch
+            {
+                IsImagePreview = false;
+            }
+        }
+    }
+
+    // ── Commands ──────────────────────────────────────────────────────────
+    [RelayCommand]
+    private void CancelScan() => _cts?.Cancel();
 
     [RelayCommand]
     private void AutoSelectAll()
@@ -139,34 +199,33 @@ public sealed partial class ResultsViewModel : ViewModelBase
             g.AutoSelectCommand.Execute(null);
     }
 
-    // ── 일괄 작업 설정 ─────────────────────────────────────────────────
-    /// <summary>Keep 파일을 제외한 모든 파일을 삭제로 설정합니다.</summary>
+    /// <summary>체크된 파일(Keep 제외)을 삭제로 설정합니다.</summary>
     [RelayCommand]
     private void SetAllDelete()
     {
         foreach (var g in Groups)
             foreach (var f in g.Files)
-                if (!f.IsDone && f.SelectedAction != FileAction.Keep)
+                if (!f.IsDone && f.IsChecked && f.SelectedAction != FileAction.Keep)
                     f.SelectedAction = FileAction.Delete;
     }
 
-    /// <summary>Keep 파일을 제외한 모든 파일을 격리로 설정합니다.</summary>
+    /// <summary>체크된 파일(Keep 제외)을 격리로 설정합니다.</summary>
     [RelayCommand]
     private void SetAllQuarantine()
     {
         foreach (var g in Groups)
             foreach (var f in g.Files)
-                if (!f.IsDone && f.SelectedAction != FileAction.Keep)
+                if (!f.IsDone && f.IsChecked && f.SelectedAction != FileAction.Keep)
                     f.SelectedAction = FileAction.Quarantine;
     }
 
-    /// <summary>Keep 파일을 제외한 모든 파일을 이동으로 설정합니다.</summary>
+    /// <summary>체크된 파일(Keep 제외)을 이동으로 설정합니다.</summary>
     [RelayCommand]
     private void SetAllMove()
     {
         foreach (var g in Groups)
             foreach (var f in g.Files)
-                if (!f.IsDone && f.SelectedAction != FileAction.Keep)
+                if (!f.IsDone && f.IsChecked && f.SelectedAction != FileAction.Keep)
                     f.SelectedAction = FileAction.MoveToFolder;
     }
 
@@ -179,7 +238,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
         {
             using var cts = new CancellationTokenSource();
             foreach (var g in Groups)
-                await g.ApplyAsync(QuarantinePath, MoveToPath, cts.Token);
+                await g.ApplyCheckedAsync(QuarantinePath, MoveToPath, cts.Token);
         }
         finally
         {
@@ -195,6 +254,9 @@ public sealed partial class ResultsViewModel : ViewModelBase
         HasScanError = false;
         ErrorMessage = string.Empty;
         Groups.Clear();
+        SelectedFile = null;
+        PreviewBitmap = null;
+        HasSelectedFile = false;
 
         if (job.Result is { } result)
             LoadResults(result);
