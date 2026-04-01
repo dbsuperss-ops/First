@@ -75,7 +75,7 @@
                     <TextBlock Classes="section-title" Text="제외 폴더 (선택사항)"/>
 
                     <Border x:Name="ExcludeDropZone"
-                            Height="60"
+                            MinHeight="80"
                             CornerRadius="8"
                             BorderThickness="2"
                             BorderBrush="{StaticResource BorderBrush}"
@@ -132,7 +132,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:FileTypeCategoryViewModel">
-                                <CheckBox Content="{Binding DisplayName}"
+                                <CheckBox Content="{Binding Label}"
                                           IsChecked="{Binding IsSelected}"
                                           Margin="0 0 16 8"/>
                             </DataTemplate>
