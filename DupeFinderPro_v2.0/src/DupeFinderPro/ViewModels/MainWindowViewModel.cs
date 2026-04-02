@@ -91,6 +91,13 @@ public sealed partial class MainWindowViewModel : ViewModelBase
 
         // 중복 스캔 시작 시 결과 화면으로 이동
         _duplicateScanVm.ScanStarted += () => NavigateTo(AppPage.DuplicateResults);
+
+        // 스캔 기록 → 결과 화면으로 이동
+        _historyVm.ViewResultsRequested += job =>
+        {
+            _resultsVm.LoadJob(job);
+            NavigateTo(AppPage.DuplicateResults);
+        };
     }
 
     // ── 파일 분류 활성 상태 ─────────────────────────────────────────────

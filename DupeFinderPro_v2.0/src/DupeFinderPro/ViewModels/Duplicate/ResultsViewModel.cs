@@ -40,13 +40,25 @@ public sealed partial class ResultsViewModel : ViewModelBase
     [ObservableProperty] private string _moveToPath = string.Empty;
     [ObservableProperty] private bool   _isApplying;
 
+    public string QuarantineFolderName => FolderDisplayName(QuarantinePath);
+    public string MoveToFolderName     => FolderDisplayName(MoveToPath);
+
     // ── Preview ───────────────────────────────────────────────────────────
     [ObservableProperty] private FileEntryViewModel? _selectedFile;
     [ObservableProperty] private Bitmap?             _previewBitmap;
     [ObservableProperty] private bool                _isImagePreview;
     [ObservableProperty] private bool                _hasSelectedFile;
 
+    // ── Sort / Filter ─────────────────────────────────────────────────────
+    [ObservableProperty] private string _selectedSortMode   = "낭비 공간";
+    [ObservableProperty] private string _filterExtension    = string.Empty;
+    [ObservableProperty] private double _filterMinSizeMb;
+
+    public static IReadOnlyList<string> SortModeLabels { get; } =
+        ["낭비 공간", "파일 수", "파일명", "파일 크기"];
+
     // ── Groups ────────────────────────────────────────────────────────────
+    private readonly List<DuplicateGroupViewModel> _allGroups = [];
     public ObservableCollection<DuplicateGroupViewModel> Groups { get; } = [];
 
     public ResultsViewModel(ScanJobService scanJobService, CleanupOrchestrator cleanup)
@@ -126,15 +138,17 @@ public sealed partial class ResultsViewModel : ViewModelBase
         TotalWasted  = FormatBytes(result.TotalWastedBytes);
         ScanDuration = $"{result.ElapsedTime.TotalSeconds:F1}s";
 
+        _allGroups.Clear();
         Groups.Clear();
         var index = 1;
         foreach (var g in result.DuplicateGroups.OrderByDescending(g => g.WastedBytes))
         {
             var groupVm = new DuplicateGroupViewModel(g, _cleanup) { GroupNumber = index++ };
             SyncPathsToGroup(groupVm);
-            Groups.Add(groupVm);
+            _allGroups.Add(groupVm);
         }
 
+        ApplySortFilter();
         HasResults = TotalGroups > 0;
         IsEmpty    = TotalGroups == 0;
     }
@@ -150,6 +164,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
 
     partial void OnQuarantinePathChanged(string value)
     {
+        OnPropertyChanged(nameof(QuarantineFolderName));
         foreach (var g in Groups)
             foreach (var f in g.Files)
                 f.QuarantinePath = value;
@@ -157,9 +172,45 @@ public sealed partial class ResultsViewModel : ViewModelBase
 
     partial void OnMoveToPathChanged(string value)
     {
+        OnPropertyChanged(nameof(MoveToFolderName));
         foreach (var g in Groups)
             foreach (var f in g.Files)
                 f.MoveToPath = value;
+    }
+
+    partial void OnSelectedSortModeChanged(string value)  => ApplySortFilter();
+    partial void OnFilterExtensionChanged(string value)   => ApplySortFilter();
+    partial void OnFilterMinSizeMbChanged(double value)   => ApplySortFilter();
+
+    private void ApplySortFilter()
+    {
+        var filtered = _allGroups.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(FilterExtension))
+        {
+            var ext = FilterExtension.Trim().TrimStart('.');
+            filtered = filtered.Where(g => g.Group.Files.Any(f =>
+                Path.GetExtension(f.FileName).TrimStart('.')
+                    .Equals(ext, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (FilterMinSizeMb > 0)
+        {
+            var minBytes = (long)(FilterMinSizeMb * 1_048_576);
+            filtered = filtered.Where(g => g.Group.WastedBytes >= minBytes);
+        }
+
+        var sorted = SelectedSortMode switch
+        {
+            "파일 수"  => filtered.OrderByDescending(g => g.Group.Files.Count),
+            "파일명"   => filtered.OrderBy(g => g.Group.Files.FirstOrDefault()?.FileName ?? string.Empty),
+            "파일 크기" => filtered.OrderByDescending(g => g.Group.SizeBytes),
+            _          => filtered.OrderByDescending(g => g.Group.WastedBytes)
+        };
+
+        Groups.Clear();
+        foreach (var g in sorted)
+            Groups.Add(g);
     }
 
     // ── Preview ───────────────────────────────────────────────────────────
@@ -193,11 +244,25 @@ public sealed partial class ResultsViewModel : ViewModelBase
     [RelayCommand]
     private void CancelScan() => _cts?.Cancel();
 
+    /// <summary>모든 파일의 체크박스를 선택합니다.</summary>
     [RelayCommand]
-    private void AutoSelectAll()
+    private void CheckAll()
     {
         foreach (var g in Groups)
+            g.IsGroupChecked = true;
+    }
+
+    /// <summary>각 그룹에서 첫 번째 파일 유지, 나머지 삭제 설정 후 즉시 적용합니다.</summary>
+    [RelayCommand]
+    private async Task DeleteDuplicatesAsync()
+    {
+        if (IsApplying) return;
+        foreach (var g in Groups)
+        {
             g.AutoSelectCommand.Execute(null);
+            g.IsGroupChecked = true;
+        }
+        await ApplyAllAsync();
     }
 
     /// <summary>체크된 파일(Keep 제외)을 삭제로 설정합니다.</summary>
@@ -269,5 +334,13 @@ public sealed partial class ResultsViewModel : ViewModelBase
         if (bytes >= 1_048_576)     return $"{bytes / 1_048_576.0:F1} MB";
         if (bytes >= 1_024)         return $"{bytes / 1_024.0:F1} KB";
         return $"{bytes} B";
+    }
+
+    private static string FolderDisplayName(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return "미설정";
+        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(trimmed);
+        return string.IsNullOrEmpty(name) ? trimmed : name;
     }
 }

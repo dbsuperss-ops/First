@@ -77,6 +77,24 @@ public sealed partial class ScanHistoryViewModel : ViewModelBase
         if (item is not null)
             ViewResultsRequested?.Invoke(item.Job);
     }
+
+    public string GetExportCsv()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("이름,상태,날짜,폴더,결과,소요시간");
+        foreach (var item in Items)
+            sb.AppendLine(string.Join(",",
+                CsvField(item.Name),
+                CsvField(item.Status),
+                CsvField(item.CreatedAt),
+                CsvField(item.Paths),
+                CsvField(item.ResultSummary),
+                CsvField(item.Duration)));
+        return sb.ToString();
+    }
+
+    private static string CsvField(string value) =>
+        $"\"{value.Replace("\"", "\"\"")}\"";
 }
 
 public sealed class ScanHistoryItemViewModel(ScanJob job)

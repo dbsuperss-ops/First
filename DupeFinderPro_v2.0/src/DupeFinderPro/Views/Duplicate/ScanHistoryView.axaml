@@ -7,10 +7,16 @@
     <DockPanel Margin="32 28">
 
         <!-- ── 헤더 ──────────────────────────────────────── -->
-        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0 0 0 20">
-            <TextBlock Classes="page-title" Text="스캔 기록"/>
-            <TextBlock Classes="muted" Text="이전 스캔 및 결과를 확인하세요"/>
-        </StackPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0 0 0 20">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="page-title" Text="스캔 기록"/>
+                <TextBlock Classes="muted" Text="이전 스캔 및 결과를 확인하세요"/>
+            </StackPanel>
+            <Button Grid.Column="1" Classes="secondary"
+                    Content="📥 내보내기 (CSV)"
+                    VerticalAlignment="Center"
+                    Click="Export_Click"/>
+        </Grid>
 
         <!-- ── 필터 바 ──────────────────────────────────── -->
         <Border DockPanel.Dock="Top" Classes="card" Margin="0 0 0 16">
