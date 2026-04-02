@@ -140,51 +140,74 @@
                 <ItemsControl ItemsSource="{Binding Groups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
-                            <Border Classes="card" Margin="0 0 0 12">
+                            <Border Classes="card" Margin="0 0 0 12"
+                                    BorderBrush="{StaticResource AccentTealBrush}"
+                                    BorderThickness="4 0 0 0">
                                 <StackPanel Spacing="0">
 
-                                    <!-- 그룹 헤더 -->
-                                    <Grid ColumnDefinitions="Auto,*">
-                                        <!-- 그룹 체크박스 -->
-                                        <CheckBox Grid.Column="0"
-                                                  IsChecked="{Binding IsGroupChecked}"
-                                                  VerticalAlignment="Center"
-                                                  Margin="0 0 8 0"/>
+                                    <!-- 그룹 헤더 (연한 teal 배경) -->
+                                    <Border Background="#E8FDF8"
+                                            CornerRadius="8 8 0 0"
+                                            Margin="-20 -20 -20 12"
+                                            Padding="12 10">
+                                        <Grid ColumnDefinitions="Auto,Auto,*">
+                                            <!-- 그룹 체크박스 -->
+                                            <CheckBox Grid.Column="0"
+                                                      IsChecked="{Binding IsGroupChecked}"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0 0 8 0"/>
 
-                                        <!-- 접기/펼치기 버튼 (헤더 나머지 영역 전체) -->
-                                        <Button Grid.Column="1"
-                                                Background="Transparent"
-                                                HorizontalContentAlignment="Stretch"
-                                                Padding="0"
-                                                Command="{Binding ToggleExpandedCommand}">
-                                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
-                                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                                    <TextBlock Classes="muted" Text="해시:"/>
-                                                    <SelectableTextBlock FontFamily="Cascadia Code,Consolas,monospace"
+                                            <!-- 그룹 번호 배지 -->
+                                            <Border Grid.Column="1"
+                                                    Background="{StaticResource AccentTealBrush}"
+                                                    CornerRadius="12"
+                                                    Padding="10 3"
+                                                    Margin="0 0 10 0"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding GroupLabel}"
+                                                           Foreground="White"
+                                                           FontWeight="Bold"
+                                                           FontSize="13"/>
+                                            </Border>
+
+                                            <!-- 접기/펼치기 버튼 -->
+                                            <Button Grid.Column="2"
+                                                    Background="Transparent"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    Padding="0"
+                                                    Command="{Binding ToggleExpandedCommand}">
+                                                <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Classes="muted" Text="해시:"
+                                                                   VerticalAlignment="Center"/>
+                                                        <TextBlock FontFamily="Cascadia Code,Consolas,monospace"
                                                                    Text="{Binding Hash}"
-                                                                   Foreground="{StaticResource AccentTealBrush}"/>
-                                                </StackPanel>
-                                                <TextBlock Grid.Column="1" Classes="muted"
-                                                           Text="{Binding FileCount}"
-                                                           VerticalAlignment="Center"
-                                                           Margin="16 0"/>
-                                                <TextBlock Grid.Column="2"
-                                                           Foreground="{StaticResource StatusOrangeBrush}"
-                                                           FontWeight="SemiBold"
-                                                           Text="{Binding WastedBytes}"
-                                                           VerticalAlignment="Center"
-                                                           Margin="0 0 16 0"/>
-                                                <Button Grid.Column="3" Classes="secondary"
-                                                        Content="자동 선택"
-                                                        Command="{Binding AutoSelectCommand}"
-                                                        Padding="10 4" Margin="0 0 8 0"/>
-                                                <TextBlock Grid.Column="4"
-                                                           Text="{Binding ExpandIcon}"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"/>
-                                            </Grid>
-                                        </Button>
-                                    </Grid>
+                                                                   Foreground="{StaticResource AccentTealBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="12"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Classes="muted"
+                                                               Text="{Binding FileCount}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="16 0"/>
+                                                    <TextBlock Grid.Column="2"
+                                                               Foreground="{StaticResource StatusOrangeBrush}"
+                                                               FontWeight="SemiBold"
+                                                               Text="{Binding WastedBytes}"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0 0 16 0"/>
+                                                    <Button Grid.Column="3" Classes="secondary"
+                                                            Content="자동 선택"
+                                                            Command="{Binding AutoSelectCommand}"
+                                                            Padding="10 4" Margin="0 0 8 0"/>
+                                                    <TextBlock Grid.Column="4"
+                                                               Text="{Binding ExpandIcon}"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                </Grid>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
 
                                     <!-- 파일 행 -->
                                     <ItemsControl ItemsSource="{Binding Files}"

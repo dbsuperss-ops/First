@@ -22,9 +22,8 @@
             </StackPanel>
         </Border>
 
-        <ScrollViewer Padding="32 28 32 40"
-                      VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="24">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="24" Margin="32 28 32 40">
 
             <!-- ── 헤더 ── -->
             <StackPanel Spacing="4">

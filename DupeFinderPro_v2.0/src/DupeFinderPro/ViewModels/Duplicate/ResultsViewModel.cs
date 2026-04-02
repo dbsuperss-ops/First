@@ -127,9 +127,10 @@ public sealed partial class ResultsViewModel : ViewModelBase
         ScanDuration = $"{result.ElapsedTime.TotalSeconds:F1}s";
 
         Groups.Clear();
+        var index = 1;
         foreach (var g in result.DuplicateGroups.OrderByDescending(g => g.WastedBytes))
         {
-            var groupVm = new DuplicateGroupViewModel(g, _cleanup);
+            var groupVm = new DuplicateGroupViewModel(g, _cleanup) { GroupNumber = index++ };
             SyncPathsToGroup(groupVm);
             Groups.Add(groupVm);
         }
