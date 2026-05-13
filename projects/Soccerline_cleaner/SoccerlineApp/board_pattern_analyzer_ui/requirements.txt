@@ -1,0 +1,8 @@
+pandas
+openpyxl
+xlsxwriter
+matplotlib
+seaborn
+networkx
+customtkinter
+
