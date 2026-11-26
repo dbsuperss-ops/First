@@ -7,6 +7,9 @@ public interface IFileVerifier
 {
     bool Exists(string path);
 
+    /// <summary>파일이나 폴더의 실제 ID. 경로가 달라도 같은 폴더인지 비교할 때 쓴다. 없거나 읽지 못하면 null.</summary>
+    FileIdentity? IdentityOf(string path);
+
     /// <summary>
     /// 다른 프로세스의 쓰기를 막은 채 연다. <paramref name="allowDelete"/>가 false면 삭제·이름 바꾸기도 막는다.
     /// 열지 못하면 null.

@@ -47,6 +47,8 @@ public sealed partial class ResultsViewModel : ViewModelBase
     [ObservableProperty] private string _quarantinePath = QuarantineFolder.DefaultPath;
     [ObservableProperty] private string _moveToPath = string.Empty;
     [ObservableProperty] private bool   _isApplying;
+    /// <summary>동의한 뒤 실제로 처리하는 중. 확인 창을 기다리는 동안에는 false라 "처리 중단"을 보이지 않는다.</summary>
+    [ObservableProperty] private bool   _isExecuting;
 
     public string QuarantineFolderName => FolderDisplayName(QuarantinePath);
     public string MoveToFolderName     => FolderDisplayName(MoveToPath);
@@ -148,9 +150,13 @@ public sealed partial class ResultsViewModel : ViewModelBase
         TotalWasted  = FormatBytes(result.TotalWastedBytes);
         ScanDuration = $"{result.ElapsedTime.TotalSeconds:F1}s";
 
-        HasSkippedFiles = result.SkippedFiles.Count > 0;
-        SkippedSummary  = $"검사하지 못한 파일 {result.SkippedFiles.Count}개 (읽을 수 없거나 클라우드에만 있음). 중복 여부를 알 수 없습니다.";
-        SkippedPaths    = string.Join(Environment.NewLine, result.SkippedFiles.Select(f => f.FullPath));
+        var skippedPaths = result.SkippedFiles.Select(f => f.FullPath)
+            .Concat(result.UnreadablePaths ?? [])
+            .ToList();
+        HasSkippedFiles = skippedPaths.Count > 0;
+        SkippedSummary  = $"검사하지 못한 파일 {skippedPaths.Count}개 (읽을 수 없거나 클라우드에만 있음). 중복 여부를 알 수 없습니다. " +
+                          "접근 권한이 없는 폴더 안의 파일은 이 목록에도 나오지 않습니다.";
+        SkippedPaths    = string.Join(Environment.NewLine, skippedPaths);
 
         var aliases = result.MergedAliases ?? [];
         HasMergedAliases   = aliases.Count > 0;
@@ -343,12 +349,14 @@ public sealed partial class ResultsViewModel : ViewModelBase
 
             using var cts = new CancellationTokenSource();
             _applyCts = cts;
+            IsExecuting = true;
             foreach (var (group, plan) in plans)
                 await group.ExecuteAsync(plan, cts.Token);
         }
         finally
         {
             _applyCts = null;
+            IsExecuting = false;
             IsApplying = false;
         }
     }

@@ -21,11 +21,11 @@ public sealed class ScanOrchestrator
         CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
-        var files = await _scanner.ScanAsync(filter, progress, ct);
+        var (files, unreadable) = await _scanner.ScanAsync(filter, progress, ct);
         var (groups, skipped, aliases) = await _detector.DetectAsync(files, progress, ct);
         sw.Stop();
 
         var wastedBytes = groups.Sum(g => g.WastedBytes);
-        return new ScanResult(groups, files.Count, wastedBytes, sw.Elapsed, skipped, aliases);
+        return new ScanResult(groups, files.Count, wastedBytes, sw.Elapsed, skipped, aliases, unreadable);
     }
 }

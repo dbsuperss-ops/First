@@ -59,7 +59,7 @@ public partial class ResultsView : UserControl
         var content = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
         content.Children.Add(new TextBlock
         {
-            Text = $"파일 {count}개를 삭제합니다. 네트워크 드라이브처럼 휴지통이 없는 위치의 파일은 복구하지 못할 수 있습니다.",
+            Text = $"파일 {count}개를 휴지통으로 보냅니다. 네트워크 드라이브처럼 휴지통에 넣을 수 없는 위치의 파일은 지우지 않고 남겨 둡니다.",
             TextWrapping = TextWrapping.Wrap
         });
         content.Children.Add(buttons);

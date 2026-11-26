@@ -22,7 +22,7 @@
                             VerticalAlignment="Center">
                     <Button Classes="danger" Content="처리 중단"
                             Command="{Binding CancelApplyCommand}"
-                            IsVisible="{Binding IsApplying}"
+                            IsVisible="{Binding IsExecuting}"
                             ToolTip.Tip="남은 파일의 처리를 멈춥니다. 이미 처리한 파일은 그대로입니다"/>
                 <StackPanel Orientation="Horizontal" Spacing="8"
                             IsEnabled="{Binding !IsApplying}">
@@ -326,6 +326,17 @@
                                                                              HorizontalAlignment="Center"
                                                                              TextWrapping="Wrap"
                                                                              IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                                                        <!-- 이동·격리한 파일 되돌리기 -->
+                                                        <Button Grid.Column="4"
+                                                                Padding="8 4"
+                                                                FontSize="12"
+                                                                Content="되돌리기"
+                                                                ToolTip.Tip="원래 위치로 옮깁니다"
+                                                                HorizontalAlignment="Right"
+                                                                VerticalAlignment="Center"
+                                                                IsVisible="{Binding CanRestore}"
+                                                                Command="{Binding RestoreCommand}"/>
 
                                                         <!-- 작업 버튼 (즉시 처리) -->
                                                         <StackPanel Grid.Column="4"

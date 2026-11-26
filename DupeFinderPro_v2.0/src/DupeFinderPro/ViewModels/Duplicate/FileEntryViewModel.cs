@@ -7,18 +7,24 @@ namespace DupeFinderPro.ViewModels.Duplicate;
 public sealed partial class FileEntryViewModel : ObservableObject
 {
     private readonly Func<FileEntryViewModel, FileAction, Task> _runSingle;
+    private readonly Func<FileEntryViewModel, Task> _restore;
 
     [ObservableProperty] private FileAction _selectedAction = FileAction.Keep;
     [ObservableProperty] private bool _isProcessing;
-    [ObservableProperty] private bool _isDone;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRestore))]
+    private bool _isDone;
     [ObservableProperty] private ActionOutcome _outcome;
     [ObservableProperty] private string _statusMessage = string.Empty;
     [ObservableProperty] private bool _isChecked = true;
 
     /// <summary>지금 파일이 있는 위치. 이동하면 새 위치로 바뀐다.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FullPath))]
+    [NotifyPropertyChangedFor(nameof(FullPath), nameof(CanRestore))]
     private string _currentPath;
+
+    /// <summary>이동·격리한 파일은 원래 위치로 되돌릴 수 있다. 휴지통으로 보낸 파일은 휴지통에서 복원한다.</summary>
+    public bool CanRestore => IsDone && !string.Equals(CurrentPath, Entry.FullPath, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>이동해서 다른 폴더에 남아 있다. 같은 그룹 삭제의 남는 사본 후보가 된다.</summary>
     public bool IsMoved { get; private set; }
@@ -41,11 +47,13 @@ public sealed partial class FileEntryViewModel : ObservableObject
     public bool IsDelete       => SelectedAction == FileAction.Delete;
 
     /// <param name="runSingle">이 파일 하나에 대한 작업을 그룹의 실행 경로로 보낸다(삭제 확인 포함).</param>
-    public FileEntryViewModel(FileEntry entry, Func<FileEntryViewModel, FileAction, Task> runSingle)
+    /// <param name="restore">옮긴 파일을 원래 위치로 되돌린다.</param>
+    public FileEntryViewModel(FileEntry entry, Func<FileEntryViewModel, FileAction, Task> runSingle, Func<FileEntryViewModel, Task> restore)
     {
         Entry = entry;
         _currentPath = entry.FullPath;
         _runSingle = runSingle;
+        _restore = restore;
     }
 
     /// <summary>계획에 넣을 지금 상태의 파일 정보.</summary>
@@ -78,6 +86,23 @@ public sealed partial class FileEntryViewModel : ObservableObject
 
     [RelayCommand]
     private Task SetActionDelete() => _runSingle(this, FileAction.Delete);
+
+    [RelayCommand]
+    private Task Restore() => CanRestore && !IsProcessing ? _restore(this) : Task.CompletedTask;
+
+    /// <summary>되돌리기 결과를 표시한다. 성공하면 처리 전 상태(원래 위치, "유지")로 돌아간다.</summary>
+    public void ShowRestored(ActionResult result)
+    {
+        Outcome = result.Outcome;
+        StatusMessage = result.Message;
+        if (result.Outcome != ActionOutcome.Succeeded)
+            return;
+
+        CurrentPath = Entry.FullPath;
+        IsMoved = false;
+        IsDone = false;
+        SelectedAction = FileAction.Keep;
+    }
 
     /// <summary>실행 결과를 표시한다. 성공만 완료로 잠근다.</summary>
     public void ShowResult(ActionResult result)

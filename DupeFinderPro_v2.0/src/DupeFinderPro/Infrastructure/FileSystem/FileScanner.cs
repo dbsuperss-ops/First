@@ -16,16 +16,19 @@ public sealed class FileScanner : IFileScanner
     private static readonly string DefaultQuarantinePrefix =
         QuarantineFolder.DefaultPath.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
-    public async Task<IReadOnlyList<FileEntry>> ScanAsync(
+    public async Task<ScanCollection> ScanAsync(
         ScanFilter filter,
         IProgress<ScanProgress> progress,
         CancellationToken ct = default)
     {
         var results = new List<FileEntry>();
+        var unreadable = new List<string>();
         var allowedExtensions = filter.GetAllowedExtensions();
 
-        var excludedSegments = filter.ExcludePaths
-            .Select(p => p.TrimEnd('\\', '/'))
+        // 제외 폴더는 수집 경로와 같은 형식(절대 경로, 끝 구분자 없음)으로 맞춰 폴더 단위로 비교한다.
+        var excludedFolders = filter.ExcludePaths
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(NormalizeFolder)
             .ToList();
 
         await Task.Run(() =>
@@ -63,7 +66,7 @@ public sealed class FileScanner : IFileScanner
                     {
                         var info = new FileInfo(filePath);
 
-                        if (!PassesFilter(filePath, info, filter, allowedExtensions, excludedSegments))
+                        if (!PassesFilter(filePath, info, filter, allowedExtensions, excludedFolders))
                             continue;
 
                         results.Add(new FileEntry(
@@ -77,9 +80,10 @@ public sealed class FileScanner : IFileScanner
                         if (results.Count % 100 == 0)
                             progress.Report(new ScanProgress(ScanPhase.Collecting, results.Count, 0, 0, filePath));
                     }
-                    catch
+                    catch (Exception ex) when (IsFileAccessError(ex))
                     {
-                        // skip inaccessible files
+                        // 정보를 읽지 못한 파일은 비교하지 못했다고 결과에 알린다. 그 밖의 예외는 버그이므로 숨기지 않는다.
+                        unreadable.Add(filePath);
                     }
                 }
             }
@@ -87,7 +91,23 @@ public sealed class FileScanner : IFileScanner
             progress.Report(new ScanProgress(ScanPhase.Collecting, results.Count, results.Count, 0));
         }, ct);
 
-        return results;
+        return new ScanCollection(results, unreadable);
+    }
+
+    /// <summary>건너뛰어도 되는 파일 접근 오류. 그 밖의 예외는 작업 실패로 드러낸다.</summary>
+    public static bool IsFileAccessError(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or NotSupportedException;
+
+    private static string NormalizeFolder(string folder)
+    {
+        try
+        {
+            return Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return folder.TrimEnd('\\', '/');
+        }
     }
 
     /// <summary>휴지통·시스템 볼륨 정보·격리 폴더(기본 경로 또는 격리 표식이 있는 폴더와 그 하위) 안의 파일인지.</summary>
@@ -115,7 +135,7 @@ public sealed class FileScanner : IFileScanner
         FileInfo info,
         ScanFilter filter,
         IReadOnlySet<string> allowedExtensions,
-        IReadOnlyList<string> excludedSegments)
+        IReadOnlyList<string> excludedFolders)
     {
         // System file protection
         if (filter.ExcludeSystemFiles)
@@ -130,10 +150,10 @@ public sealed class FileScanner : IFileScanner
             }
         }
 
-        // Exclude paths
-        foreach (var excluded in excludedSegments)
+        // Exclude paths: 그 폴더 자체와 하위만. C:\Data를 제외해도 C:\Database는 검사한다.
+        foreach (var excluded in excludedFolders)
         {
-            if (fullPath.StartsWith(excluded, StringComparison.OrdinalIgnoreCase))
+            if (fullPath.StartsWith(excluded + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 return false;
         }
 

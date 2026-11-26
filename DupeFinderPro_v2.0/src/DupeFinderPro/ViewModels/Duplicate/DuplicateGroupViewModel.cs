@@ -47,7 +47,7 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
         _confirmDelete = confirmDelete;
         // 처음 선택값은 모두 "유지"다. 삭제는 사용자가 고르거나 "자동 선택"·"중복 삭제"를 눌렀을 때만 정해진다.
         Files = new ObservableCollection<FileEntryViewModel>(
-            group.Files.Select(f => new FileEntryViewModel(f, RunSingleAsync)));
+            group.Files.Select(f => new FileEntryViewModel(f, RunSingleAsync, RestoreAsync)));
 
         // Bubble file-level checkbox changes up to group checkbox
         foreach (var vm in Files)
@@ -163,6 +163,23 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
         await ExecuteAsync(plan, CancellationToken.None);
         if (action == FileAction.Delete && file.Outcome == ActionOutcome.Held)
             file.SelectedAction = FileAction.Keep;
+    }
+
+    /// <summary>이동·격리한 파일을 원래 위치로 되돌린다. 같은 그룹의 다른 작업과 겹치지 않게 실행한다.</summary>
+    private async Task RestoreAsync(FileEntryViewModel file)
+    {
+        file.IsProcessing = true;
+        file.StatusMessage = "되돌리는 중…";
+        await _gate.WaitAsync();
+        try
+        {
+            file.ShowRestored(await _cleanup.RestoreAsync(file.Entry, file.CurrentPath, Group.Hash));
+        }
+        finally
+        {
+            _gate.Release();
+            file.IsProcessing = false;
+        }
     }
 
     private static bool SamePath(FileEntry entry, FileEntryViewModel file) =>

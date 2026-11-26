@@ -6,4 +6,5 @@ public sealed record ScanResult(
     long TotalWastedBytes,
     TimeSpan ElapsedTime,
     IReadOnlyList<FileEntry> SkippedFiles,
-    IReadOnlyList<FileEntry>? MergedAliases = null);
+    IReadOnlyList<FileEntry>? MergedAliases = null,
+    IReadOnlyList<string>? UnreadablePaths = null);

@@ -1,28 +1,19 @@
 using System.Security.Cryptography;
 using DupeFinderPro.Domain.Interfaces;
 using DupeFinderPro.Domain.Models;
-using Microsoft.VisualBasic.FileIO;
 
 namespace DupeFinderPro.Infrastructure.FileSystem;
 
 public sealed class FileOperationService : IFileOperationService
 {
-    public Task<bool> MoveToRecycleBinAsync(string filePath, CancellationToken ct = default)
+    public Task<RecycleOutcome> MoveToRecycleBinAsync(string filePath, CancellationToken ct = default)
     {
-        return Task.Run(() =>
-        {
-            ct.ThrowIfCancellationRequested();
-
-            if (!File.Exists(filePath))
-                return false;
-
-            Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
-                filePath,
-                UIOption.OnlyErrorDialogs,
-                RecycleOption.SendToRecycleBin);
-
-            return true;
-        }, ct);
+        ct.ThrowIfCancellationRequested();
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("휴지통 삭제는 Windows에서만 지원합니다.");
+        return File.Exists(filePath)
+            ? ShellRecycleBin.RecycleAsync(filePath)
+            : Task.FromResult(RecycleOutcome.Missing);
     }
 
     public Task<string?> TransferAsync(string filePath, string destinationFolder, bool markAsQuarantine, CancellationToken ct = default)
@@ -39,22 +30,48 @@ public sealed class FileOperationService : IFileOperationService
                 EnsureQuarantineMarker(destinationFolder);
 
             var dest = FreeName(filePath, destinationFolder);
-            var sourceId = FileIdentityReader.TryGet(filePath)
-                           ?? throw new IOException("원본 파일 ID를 확인할 수 없어 옮기지 않음");
-            var folderId = FileIdentityReader.TryGet(destinationFolder);
-
-            if (folderId is { } f && f.VolumeSerial == sourceId.VolumeSerial)
-            {
-                // 같은 볼륨: 이름만 바뀌므로 내용은 그대로다. 옮긴 파일이 같은 파일인지만 확인한다.
-                File.Move(filePath, dest);
-                if (FileIdentityReader.TryGet(dest) != sourceId)
-                    throw new IOException($"옮긴 뒤 같은 파일인지 확인하지 못함: {dest}");
-                return dest;
-            }
-
-            CopyVerifiedThenRemove(filePath, dest, ct);
+            MoveVerified(filePath, dest, ct);
             return dest;
         }, ct);
+    }
+
+    public Task<bool> RestoreAsync(string currentPath, string originalPath, CancellationToken ct = default)
+    {
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (!File.Exists(currentPath))
+                return false;
+            if (File.Exists(originalPath))
+                throw new IOException("원래 위치에 같은 이름의 파일이 있어 되돌리지 않음");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(originalPath)!);
+            MoveVerified(currentPath, originalPath, ct);
+            return true;
+        }, ct);
+    }
+
+    /// <summary>
+    /// 같은 볼륨은 이름 바꾸기 뒤 파일 ID를 확인하고, 다른 볼륨은 복사 → 내용 확인 → 원본 삭제 순서로 옮긴다.
+    /// 목적지에 파일이 있으면 덮어쓰지 않고 실패한다.
+    /// </summary>
+    private static void MoveVerified(string filePath, string dest, CancellationToken ct)
+    {
+        var sourceId = FileIdentityReader.TryGet(filePath)
+                       ?? throw new IOException("원본 파일 ID를 확인할 수 없어 옮기지 않음");
+        var folderId = FileIdentityReader.TryGet(Path.GetDirectoryName(dest)!);
+
+        if (folderId is { } f && f.VolumeSerial == sourceId.VolumeSerial)
+        {
+            // 같은 볼륨: 이름만 바뀌므로 내용은 그대로다. 옮긴 파일이 같은 파일인지만 확인한다.
+            File.Move(filePath, dest);
+            if (FileIdentityReader.TryGet(dest) != sourceId)
+                throw new IOException($"옮긴 뒤 같은 파일인지 확인하지 못함: {dest}");
+            return;
+        }
+
+        CopyVerifiedThenRemove(filePath, dest, ct);
     }
 
     /// <summary>다른 볼륨: 복사본의 내용을 원본과 비교한 뒤에만 원본을 지운다. 실패·취소되면 복사본을 지우고 원본을 남긴다.</summary>

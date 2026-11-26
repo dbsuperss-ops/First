@@ -11,6 +11,8 @@ public sealed class FileVerifier : IFileVerifier
 {
     public bool Exists(string path) => File.Exists(path);
 
+    public FileIdentity? IdentityOf(string path) => FileIdentityReader.TryGet(path);
+
     public ILockedFile? TryOpenLocked(string path, bool allowDelete)
     {
         try

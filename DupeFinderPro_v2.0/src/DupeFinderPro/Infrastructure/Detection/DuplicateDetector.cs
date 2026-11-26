@@ -130,9 +130,10 @@ public sealed class DuplicateDetector : IDuplicateDetector
                         results[item.i] = updater(item.f, hash);
                     }
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                catch (Exception ex) when (FileScanner.IsFileAccessError(ex))
                 {
                     // 해시가 없는 항목은 호출부에서 비교 대상에서 빼고 SkippedFiles로 보고한다.
+                    // 그 밖의 예외는 버그일 수 있으므로 삼키지 않고 스캔 실패로 드러낸다.
                     results[item.i] = item.f;
                 }
 

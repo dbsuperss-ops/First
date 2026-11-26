@@ -10,6 +10,7 @@ using DupeFinderPro.Infrastructure.FileSystem;
 // 실제 휴지통 대신 임시 폴더의 파일만 지우는 대역(TempDelete)을 쓴다. 이동·격리는 실제 구현을 쓴다.
 var dir = Directory.CreateTempSubdirectory("dupe-checks-").FullName;
 var otherVolumeDir = OtherVolumeDir(dir);
+var log = new MemoryLog();
 var failures = 0;
 try
 {
@@ -52,7 +53,7 @@ try
         var copies = Enumerable.Range(0, count).Select(i => Make($"{tag}-{i}.bin", 50, 9)).ToArray();
         var group = new DuplicateGroup(HashOf(copies[0].FullPath), copies) { SuggestedKeep = copies[keep] };
         var ops = new TempDelete(dir);
-        var vm = new ResultsViewModel(null!, new CleanupOrchestrator(ops, new FileVerifier()))
+        var vm = new ResultsViewModel(null!, new CleanupOrchestrator(ops, new FileVerifier(), log))
         {
             QuarantinePath = Path.Combine(dir, "quarantine"),
         };
@@ -149,7 +150,7 @@ try
         ("slashes + dot segments", [root, root.Replace('\\', '/') + "/sub/../sub"]),
     })
     {
-        var found = await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = paths, ExcludeSystemFiles = false }, new Progress<ScanProgress>());
+        var found = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = paths, ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
         var (dupes, _, _) = await detector.DetectAsync(found, new Progress<ScanProgress>());
         Check($"overlap {label}: one file is collected once (entries={found.Count}, groups={dupes.Count})", found.Count == 1 && dupes.Count == 0);
         Check($"overlap {label}: highest priority is kept (priority={found[0].SourcePriority})", found[0].SourcePriority == 0);
@@ -164,7 +165,7 @@ try
 
     var link = Path.Combine(dir, "scan-junction");
     Mklink($"/J \"{link}\" \"{root}\"");
-    var linked = await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [root, link], ExcludeSystemFiles = false }, new Progress<ScanProgress>());
+    var linked = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [root, link], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
     var (jGroups, _, jAliases) = await detector.DetectAsync(linked, new Progress<ScanProgress>());
     Check($"I1 junction root: one physical file is not its own duplicate (junction={Directory.Exists(link)}, entries={linked.Count}, groups={jGroups.Count}, merged={jAliases.Count})",
         Directory.Exists(link) && linked.Count == 2 && jGroups.Count == 0 && jAliases.Count == 1);
@@ -177,14 +178,14 @@ try
     var hardB = Path.Combine(hardDir, "b.bin");
     File.WriteAllBytes(hardA, new byte[64]);
     Mklink($"/H \"{hardB}\" \"{hardA}\"");
-    var hardFound = await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [hardDir], ExcludeSystemFiles = false }, new Progress<ScanProgress>());
+    var hardFound = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [hardDir], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
     var (hGroups, _, hAliases) = await detector.DetectAsync(hardFound, new Progress<ScanProgress>());
     Check($"I1 hard links are merged, not grouped (link={File.Exists(hardB)}, entries={hardFound.Count}, groups={hGroups.Count}, merged={hAliases.Count})",
         File.Exists(hardB) && hardFound.Count == 2 && hGroups.Count == 0 && hAliases.Count == 1);
     {
         var entries = new[] { hardA, hardB }.Select(p => new FileEntry(p, Path.GetFileName(p), 64, DateTime.Now, DateTime.Now, 0)).ToArray();
         var ops = new TempDelete(dir);
-        var vm = new ResultsViewModel(null!, new CleanupOrchestrator(ops, new FileVerifier())) { ConfirmDeleteAsync = _ => Task.FromResult(true) };
+        var vm = new ResultsViewModel(null!, new CleanupOrchestrator(ops, new FileVerifier(), log)) { ConfirmDeleteAsync = _ => Task.FromResult(true) };
         vm.LoadJob(new ScanJob("hard", null!) { Result = new ScanResult([new DuplicateGroup(HashOf(hardA), entries)], 2, 64, TimeSpan.Zero, []) });
         await Delete(vm, 0);
         Check($"I1 a hard link is not a surviving copy of its twin (deleted={ops.Deleted}, status={F(vm, 0).StatusMessage})",
@@ -200,7 +201,7 @@ try
     File.WriteAllText(Path.Combine(marked, QuarantineFolder.MarkerFileName), "");
     foreach (var p in new[] { Path.Combine(q, "orig.bin"), Path.Combine(marked, "nested", "orig.bin"), Path.Combine(recycle, "orig.bin") })
         File.WriteAllBytes(p, Enumerable.Repeat((byte)7, 128).ToArray());
-    var qFound = await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [q, marked], ExcludeSystemFiles = false }, new Progress<ScanProgress>());
+    var qFound = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [q, marked], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
     Check($"I19 quarantine and recycle bin folders are never collected (found={string.Join(",", qFound.Select(f => Path.GetRelativePath(q, f.FullPath)))})",
         qFound.Count == 1 && qFound[0].FullPath == Path.Combine(q, "orig.bin"));
 
@@ -208,8 +209,8 @@ try
     Directory.CreateDirectory(empty);
     File.WriteAllBytes(Path.Combine(empty, ".gitkeep"), []);
     File.WriteAllBytes(Path.Combine(empty, "__init__.py"), []);
-    var eDefault = await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [empty], ExcludeSystemFiles = false }, new Progress<ScanProgress>());
-    var eIncluded = await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [empty], ExcludeSystemFiles = false, IncludeEmptyFiles = true }, new Progress<ScanProgress>());
+    var eDefault = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [empty], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
+    var eIncluded = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [empty], ExcludeSystemFiles = false, IncludeEmptyFiles = true }, new Progress<ScanProgress>())).Files;
     Check($"I7 empty files are excluded by default and included on request ({eDefault.Count}/{eIncluded.Count})", eDefault.Count == 0 && eIncluded.Count == 2);
 
     // ── 파일별 삭제 확인(I6)·중복 실행(I4)·결과 표시(I3) ───────────────
@@ -337,6 +338,76 @@ try
         Console.WriteLine("SKIP I20 cross-volume move (no other volume found)");
     }
 
+    // ── 3단계: 제외 경로는 폴더 경계로(I8) ────────────────────────────
+    var exRoot = Path.Combine(dir, "exclude");
+    foreach (var (folder, name) in new[] { ("data", "a.bin"), ("database", "b.bin") })
+    {
+        Directory.CreateDirectory(Path.Combine(exRoot, folder));
+        File.WriteAllBytes(Path.Combine(exRoot, folder, name), new byte[10]);
+    }
+    var exFound = (await new FileScanner().ScanAsync(ScanFilter.Empty with
+    {
+        IncludePaths = [exRoot], ExcludePaths = [Path.Combine(exRoot, "data") + "\\"], ExcludeSystemFiles = false,
+    }, new Progress<ScanProgress>())).Files;
+    Check($"I8 excluding a folder does not exclude a sibling with a longer name (found={string.Join(",", exFound.Select(f => f.FileName))})",
+        exFound.Select(f => f.FileName).SequenceEqual(["b.bin"]));
+
+    // ── 3단계: 휴지통에 넣을 수 없는 위치(I6) ──────────────────────────
+    // 로컬 디스크를 관리 공유(\\localhost\X$)로 열면 네트워크 경로라 휴지통에 들어가지 않는다.
+    var unc = $@"\\localhost\{dir[0]}${dir[2..]}";
+    if (Directory.Exists(unc))
+    {
+        s = Setup("unc", 2, true);
+        var real = new ResultsViewModel(null!, new CleanupOrchestrator(new FileOperationService(), new FileVerifier(), log))
+        {
+            ConfirmDeleteAsync = _ => Task.FromResult(true),
+            QuarantinePath = Path.Combine(dir, "quarantine"),
+        };
+        var uncCopies = new[] { s.Copies[0] with { FullPath = Path.Combine(unc, s.Copies[0].FileName) }, s.Copies[1] };
+        real.LoadJob(new ScanJob("unc", null!) { Result = new ScanResult([new DuplicateGroup(HashOf(s.Copies[0].FullPath), uncCopies)], 2, 50, TimeSpan.Zero, []) });
+        await Delete(real, 0);
+        Check($"I6 a file that cannot go to the recycle bin is not deleted (exists={File.Exists(s.Copies[0].FullPath)}, status={F(real, 0).StatusMessage})",
+            File.Exists(s.Copies[0].FullPath) && F(real, 0).StatusMessage == CleanupOrchestrator.NotRecyclableMessage);
+    }
+    else
+    {
+        Console.WriteLine($"SKIP I6 recycle bin refusal ({unc} not reachable)");
+    }
+
+    // ── 3단계: 같은 실체의 폴더 거부·작업 기록·되돌리기(I14) ──────────
+    s = Setup("alias-folder", 2, true);
+    var dirAlias = Path.Combine(Path.GetDirectoryName(dir)!, $"alias-{Guid.NewGuid():N}");
+    Mklink($"/J \"{dirAlias}\" \"{dir}\"");
+    s.Vm.MoveToPath = dirAlias;
+    await F(s.Vm, 0).SetActionMoveCommand.ExecuteAsync(null);
+    Check($"I14 moving into the file's own folder through a junction is refused (junction={Directory.Exists(dirAlias)}, status={F(s.Vm, 0).StatusMessage})",
+        Directory.Exists(dirAlias) && F(s.Vm, 0).Outcome == ActionOutcome.Failed && File.Exists(s.Copies[0].FullPath));
+    if (Directory.Exists(dirAlias)) Directory.Delete(dirAlias);
+
+    s = Setup("logged", 2, true);
+    var logBefore = log.Entries.Count;
+    await Delete(s.Vm, 0);
+    var logged = log.Entries.Skip(logBefore).ToList();
+    Check($"I14 every action is written to the cleanup log ({string.Join(",", logged.Select(e => $"{e.Action}/{e.Outcome}"))})",
+        logged.Count == 1 && logged[0].Action == "Delete" && logged[0].Outcome == "Succeeded" && logged[0].OriginalPath == s.Copies[0].FullPath);
+
+    s = Setup("restore", 2, true);
+    await F(s.Vm, 0).SetActionQuarantineCommand.ExecuteAsync(null);
+    var quarantined = F(s.Vm, 0).CurrentPath;
+    var canRestore = F(s.Vm, 0).CanRestore;
+    await F(s.Vm, 0).RestoreCommand.ExecuteAsync(null);
+    Check($"I14 a quarantined file can be restored to its original path (canRestore={canRestore}, back={File.Exists(s.Copies[0].FullPath)}, status={F(s.Vm, 0).StatusMessage})",
+        canRestore && File.Exists(s.Copies[0].FullPath) && !File.Exists(quarantined) && !F(s.Vm, 0).IsDone && !F(s.Vm, 0).CanRestore &&
+        log.Entries[^1].Action == "Restore");
+
+    s = Setup("restore-blocked", 2, true);
+    await F(s.Vm, 0).SetActionQuarantineCommand.ExecuteAsync(null);
+    File.WriteAllText(s.Copies[0].FullPath, "new file at the old path");
+    await F(s.Vm, 0).RestoreCommand.ExecuteAsync(null);
+    Check($"I14 restore never overwrites a file at the original path (status={F(s.Vm, 0).StatusMessage})",
+        F(s.Vm, 0).Outcome == ActionOutcome.Failed && File.ReadAllText(s.Copies[0].FullPath) == "new file at the old path" &&
+        File.Exists(F(s.Vm, 0).CurrentPath));
+
     using var cancelled = new CancellationTokenSource();
     cancelled.Cancel();
     try
@@ -370,7 +441,14 @@ static string? OtherVolumeDir(string dir)
     return null;
 }
 
-/// <summary>휴지통 대신 임시 폴더의 파일을 바로 지운다. 이동·격리는 실제 구현을 쓴다.</summary>
+/// <summary>작업 기록을 파일 대신 메모리에 모은다.</summary>
+sealed class MemoryLog : ICleanupLog
+{
+    public List<CleanupLogEntry> Entries { get; } = [];
+    public void Record(CleanupLogEntry entry) { lock (Entries) Entries.Add(entry); }
+}
+
+/// <summary>휴지통 대신 임시 폴더의 파일을 바로 지운다. 이동·격리·되돌리기는 실제 구현을 쓴다.</summary>
 sealed class TempDelete(string root) : IFileOperationService
 {
     private readonly FileOperationService _real = new();
@@ -381,21 +459,24 @@ sealed class TempDelete(string root) : IFileOperationService
     public int Deleted { get; private set; }
     public int Calls { get; private set; }
 
-    public async Task<bool> MoveToRecycleBinAsync(string filePath, CancellationToken ct = default)
+    public async Task<RecycleOutcome> MoveToRecycleBinAsync(string filePath, CancellationToken ct = default)
     {
         if (!filePath.StartsWith(root)) throw new InvalidOperationException(filePath);
         Calls++;
         if (Gate is not null) await Gate.Task;
         BeforeDelete?.Invoke(filePath);
-        if (ThrowCancel) throw new OperationCanceledException(); // 셸이 작업을 중단한 경우와 같다
-        if (!File.Exists(filePath)) return false;                 // 실제 서비스와 같다
+        if (ThrowCancel) throw new OperationCanceledException(); // 작업이 중단된 경우
+        if (!File.Exists(filePath)) return RecycleOutcome.Missing; // 실제 서비스와 같다
         File.Delete(filePath);
         Deleted++;
-        return true;
+        return RecycleOutcome.Recycled;
     }
 
     public Task<string?> TransferAsync(string filePath, string destinationFolder, bool markAsQuarantine, CancellationToken ct = default) =>
         _real.TransferAsync(filePath, destinationFolder, markAsQuarantine, ct);
+
+    public Task<bool> RestoreAsync(string currentPath, string originalPath, CancellationToken ct = default) =>
+        _real.RestoreAsync(currentPath, originalPath, ct);
 
     public Task<int> DeleteEmptyFoldersAsync(string rootPath, CancellationToken ct = default) => throw new NotSupportedException();
 }
