@@ -7,6 +7,10 @@ using DupeFinderPro.Infrastructure.Detection;
 using DupeFinderPro.Infrastructure.Hashing;
 using DupeFinderPro.Infrastructure.FileSystem;
 
+// 실제 Windows 환경 검사(subst·매핑 드라이브·UNC·대용량)는 따로 실행한다: dotnet run -- --env
+if (args.Contains("--env"))
+    return await EnvChecks.RunAsync();
+
 // 실제 휴지통 대신 임시 폴더의 파일만 지우는 대역(TempDelete)을 쓴다. 이동·격리는 실제 구현을 쓴다.
 var dir = Directory.CreateTempSubdirectory("dupe-checks-").FullName;
 var otherVolumeDir = OtherVolumeDir(dir);
