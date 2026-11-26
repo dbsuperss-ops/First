@@ -46,11 +46,14 @@ public sealed class DuplicateDetector : IDuplicateDetector
 
         var sizeFiltered = SameSizeOnly(unique);
 
-        // Step 2: partial hash
+        // Step 2: partial hash. 작은 파일은 읽다가 실제로 끝에 닿았으면 그 해시가 곧 전체 해시다.
         var withPartialHash = await ComputeHashesAsync(
             sizeFiltered,
-            f => _hasher.ComputePartialHashAsync(f.FullPath, ct),
-            (f, h) => f with { PartialHash = h },
+            async f =>
+            {
+                var partial = await _hasher.ComputePartialHashAsync(f.FullPath, ct);
+                return f with { PartialHash = partial.Hash, FullHash = partial.CoversWholeFile ? partial.Hash : null };
+            },
             ScanPhase.PartialHashing,
             progress,
             sizeFiltered.Count,
@@ -58,22 +61,24 @@ public sealed class DuplicateDetector : IDuplicateDetector
 
         skipped.AddRange(withPartialHash.Where(f => f.PartialHash is null));
 
+        // 크기와 앞부분이 모두 같은 파일만 전체 비교한다. 앞부분만 같고 크기가 다르면 중복일 수 없다.
         var partialFiltered = withPartialHash
             .Where(f => f.PartialHash is not null)
-            .GroupBy(f => f.PartialHash!)
+            .GroupBy(f => (f.SizeBytes, f.PartialHash!))
             .Where(g => g.Count() > 1)
             .SelectMany(g => g)
             .ToList();
 
-        // Step 3: full hash
-        var withFullHash = await ComputeHashesAsync(
-            partialFiltered,
-            f => _hasher.ComputeFullHashAsync(f.FullPath, ct),
-            (f, h) => f with { FullHash = h },
+        // Step 3: full hash (이미 전체를 읽은 작은 파일은 다시 읽지 않는다)
+        var needFull = partialFiltered.Where(f => f.FullHash is null).ToList();
+        var fullyHashed = await ComputeHashesAsync(
+            needFull,
+            async f => f with { FullHash = await _hasher.ComputeFullHashAsync(f.FullPath, ct) },
             ScanPhase.FullHashing,
             progress,
-            partialFiltered.Count,
+            needFull.Count,
             ct);
+        var withFullHash = partialFiltered.Where(f => f.FullHash is not null).Concat(fullyHashed).ToList();
 
         skipped.AddRange(withFullHash.Where(f => f.FullHash is null));
 
@@ -101,10 +106,10 @@ public sealed class DuplicateDetector : IDuplicateDetector
             .SelectMany(g => g)
             .ToList();
 
+    /// <summary>해시를 계산해 채운 항목을 돌려준다. 읽지 못한 파일은 그대로 돌려주므로 호출부가 해시 없음으로 걸러낸다.</summary>
     private static async Task<List<FileEntry>> ComputeHashesAsync(
         List<FileEntry> files,
-        Func<FileEntry, Task<string>> hashFunc,
-        Func<FileEntry, string, FileEntry> updater,
+        Func<FileEntry, Task<FileEntry>> hash,
         ScanPhase phase,
         IProgress<ScanProgress> progress,
         int total,
@@ -126,8 +131,7 @@ public sealed class DuplicateDetector : IDuplicateDetector
                     }
                     else
                     {
-                        var hash = await hashFunc(item.f);
-                        results[item.i] = updater(item.f, hash);
+                        results[item.i] = await hash(item.f);
                     }
                 }
                 catch (Exception ex) when (FileScanner.IsFileAccessError(ex))

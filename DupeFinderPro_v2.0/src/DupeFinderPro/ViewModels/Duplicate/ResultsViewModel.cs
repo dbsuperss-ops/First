@@ -30,6 +30,8 @@ public sealed partial class ResultsViewModel : ViewModelBase
     [ObservableProperty] private int    _totalGroups;
     [ObservableProperty] private int    _totalFiles;
     [ObservableProperty] private string _totalWasted   = string.Empty;
+    [ObservableProperty] private string _freedSpace    = string.Empty;
+    [ObservableProperty] private bool   _hasFreedSpace;
     [ObservableProperty] private string _scanDuration  = string.Empty;
     [ObservableProperty] private string _scanName      = string.Empty;
     [ObservableProperty] private string _errorMessage  = string.Empty;
@@ -145,7 +147,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
 
     private void LoadResults(ScanResult result)
     {
-        TotalGroups  = result.DuplicateGroups.Count;
+        TotalGroups  = result.DuplicateGroups.Count; // 아래 RefreshSummary가 처리 상태를 반영해 다시 센다
         TotalFiles   = result.FilesScanned;
         TotalWasted  = FormatBytes(result.TotalWastedBytes);
         ScanDuration = $"{result.ElapsedTime.TotalSeconds:F1}s";
@@ -168,6 +170,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
         foreach (var g in result.DuplicateGroups.OrderByDescending(g => g.WastedBytes))
         {
             var groupVm = new DuplicateGroupViewModel(g, _cleanup, ConfirmDeleteForFileAsync) { GroupNumber = index++ };
+            groupVm.Processed += RefreshSummary;
             SyncPathsToGroup(groupVm);
             _allGroups.Add(groupVm);
         }
@@ -175,6 +178,20 @@ public sealed partial class ResultsViewModel : ViewModelBase
         ApplySortFilter();
         HasResults = TotalGroups > 0;
         IsEmpty    = TotalGroups == 0;
+        RefreshSummary();
+    }
+
+    /// <summary>
+    /// 처리 결과로 요약을 다시 센다. 휴지통으로 보낸 파일만 확보한 공간으로 치고,
+    /// 이동·격리한 파일은 디스크 공간을 그대로 쓰므로 남은 사본으로 센다.
+    /// </summary>
+    private void RefreshSummary()
+    {
+        TotalGroups = _allGroups.Count(g => g.RemainingCount > 1);
+        TotalWasted = FormatBytes(_allGroups.Sum(g => g.Group.SizeBytes * Math.Max(0, g.RemainingCount - 1)));
+        var freed = _allGroups.Sum(g => g.Group.SizeBytes * g.DeletedCount);
+        FreedSpace = FormatBytes(freed);
+        HasFreedSpace = freed > 0;
     }
 
     private Task<bool> ConfirmDeleteForFileAsync(int count) =>

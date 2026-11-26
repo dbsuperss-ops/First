@@ -14,7 +14,7 @@
     <Src>..\..\src\DupeFinderPro</Src>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Program.cs;EnvChecks.cs" />
+    <Compile Include="Program.cs;EnvChecks.cs;PerfChecks.cs" />
     <Compile Include="$(Src)\Domain\**\*.cs" />
     <Compile Include="$(Src)\Infrastructure\Detection\*.cs" />
     <Compile Include="$(Src)\Infrastructure\Hashing\*.cs" />

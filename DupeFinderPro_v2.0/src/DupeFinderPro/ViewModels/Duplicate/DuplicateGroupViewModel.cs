@@ -111,6 +111,14 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
     }
 
     // ── 실행 ─────────────────────────────────────────────────────────────
+    /// <summary>이 그룹의 파일이 처리되거나 되돌려진 뒤. 요약 통계를 다시 계산할 때 쓴다.</summary>
+    public event Action? Processed;
+
+    /// <summary>휴지통으로 보내지 않고 남아 있는 파일 수(이동·격리한 파일 포함).</summary>
+    public int RemainingCount => Files.Count(f => !f.IsDeleted);
+
+    public int DeletedCount => Files.Count(f => f.IsDeleted);
+
     public async Task ExecuteAsync(GroupPlan plan, CancellationToken ct)
     {
         var targets = plan.Actions
@@ -146,6 +154,7 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
         {
             foreach (var (_, vm) in targets)
                 vm.IsProcessing = false;
+            Processed?.Invoke();
         }
     }
 
@@ -179,6 +188,7 @@ public sealed partial class DuplicateGroupViewModel : ObservableObject
         {
             _gate.Release();
             file.IsProcessing = false;
+            Processed?.Invoke();
         }
     }
 

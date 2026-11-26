@@ -26,6 +26,9 @@ public sealed partial class FileEntryViewModel : ObservableObject
     /// <summary>이동·격리한 파일은 원래 위치로 되돌릴 수 있다. 휴지통으로 보낸 파일은 휴지통에서 복원한다.</summary>
     public bool CanRestore => IsDone && !string.Equals(CurrentPath, Entry.FullPath, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>휴지통으로 보냈다(완료됐는데 위치가 그대로). 이동·격리한 파일은 디스크 공간을 그대로 쓴다.</summary>
+    public bool IsDeleted => IsDone && !CanRestore;
+
     /// <summary>이동해서 다른 폴더에 남아 있다. 같은 그룹 삭제의 남는 사본 후보가 된다.</summary>
     public bool IsMoved { get; private set; }
 

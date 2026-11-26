@@ -10,6 +10,9 @@ using DupeFinderPro.Infrastructure.FileSystem;
 // 실제 Windows 환경 검사(subst·매핑 드라이브·UNC·대용량)는 따로 실행한다: dotnet run -- --env
 if (args.Contains("--env"))
     return await EnvChecks.RunAsync();
+// 탐지 성능 측정: dotnet run -- --perf
+if (args.Contains("--perf"))
+    return await PerfChecks.RunAsync();
 
 // 실제 휴지통 대신 임시 폴더의 파일만 지우는 대역(TempDelete)을 쓴다. 이동·격리는 실제 구현을 쓴다.
 var dir = Directory.CreateTempSubdirectory("dupe-checks-").FullName;
@@ -341,6 +344,28 @@ try
     {
         Console.WriteLine("SKIP I20 cross-volume move (no other volume found)");
     }
+
+    // ── 5단계: 처리 후 요약 통계(I18) ──────────────────────────────────
+    s = Setup("stats", 3, true);
+    var wastedBefore = s.Vm.TotalWasted;
+    await F(s.Vm, 0).SetActionQuarantineCommand.ExecuteAsync(null);
+    var afterQuarantine = (s.Vm.TotalWasted, s.Vm.HasFreedSpace);
+    await Delete(s.Vm, 1);
+    Check($"I18 summary counts only deleted files as freed (before={wastedBefore}, after quarantine={afterQuarantine}, after delete={s.Vm.TotalWasted}/{s.Vm.FreedSpace}, groups={s.Vm.TotalGroups})",
+        wastedBefore == "100 B" && afterQuarantine == ("100 B", false) && s.Vm.TotalWasted == "50 B" && s.Vm.FreedSpace == "50 B" && s.Vm.TotalGroups == 1);
+
+    // ── 5단계: 작은 파일 해시 재사용의 경계 ────────────────────────────
+    var edge = Path.Combine(dir, "edge");
+    Directory.CreateDirectory(edge);
+    byte[] Bytes(int n, byte last) { var b = Enumerable.Repeat((byte)1, n).ToArray(); b[^1] = last; return b; }
+    File.WriteAllBytes(Path.Combine(edge, "4096-a.bin"), Bytes(4096, 9));
+    File.WriteAllBytes(Path.Combine(edge, "4096-b.bin"), Bytes(4096, 9));
+    File.WriteAllBytes(Path.Combine(edge, "4097-a.bin"), Bytes(4097, 1)); // 앞 4096바이트는 같고 마지막 1바이트만 다르다
+    File.WriteAllBytes(Path.Combine(edge, "4097-b.bin"), Bytes(4097, 2));
+    var edgeFiles = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [edge], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
+    var (edgeGroups, _, _) = await detector.DetectAsync(edgeFiles, new Progress<ScanProgress>());
+    Check($"5 exactly 4KB duplicates are found and 4KB+1 files differing in the last byte are not ({string.Join(" | ", edgeGroups.Select(g => string.Join(",", g.Files.Select(f => f.FileName))))})",
+        edgeGroups.Count == 1 && edgeGroups[0].Files.All(f => f.FileName.StartsWith("4096")) && edgeGroups[0].Hash == HashOf(Path.Combine(edge, "4096-a.bin")));
 
     // ── 3단계: 제외 경로는 폴더 경계로(I8) ────────────────────────────
     var exRoot = Path.Combine(dir, "exclude");
