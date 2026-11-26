@@ -22,10 +22,10 @@ public sealed class ScanOrchestrator
     {
         var sw = Stopwatch.StartNew();
         var files = await _scanner.ScanAsync(filter, progress, ct);
-        var groups = await _detector.DetectAsync(files, progress, ct);
+        var (groups, skipped, aliases) = await _detector.DetectAsync(files, progress, ct);
         sw.Stop();
 
         var wastedBytes = groups.Sum(g => g.WastedBytes);
-        return new ScanResult(groups, files.Count, wastedBytes, sw.Elapsed);
+        return new ScanResult(groups, files.Count, wastedBytes, sw.Elapsed, skipped, aliases);
     }
 }

@@ -20,6 +20,12 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
                             VerticalAlignment="Center">
+                    <Button Classes="danger" Content="처리 중단"
+                            Command="{Binding CancelApplyCommand}"
+                            IsVisible="{Binding IsApplying}"
+                            ToolTip.Tip="남은 파일의 처리를 멈춥니다. 이미 처리한 파일은 그대로입니다"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"
+                            IsEnabled="{Binding !IsApplying}">
                     <Button Classes="danger" Content="취소"
                             Command="{Binding CancelScanCommand}"
                             IsVisible="{Binding IsScanning}"/>
@@ -42,12 +48,11 @@
                     <Button Classes="danger" Content="중복 삭제"
                             Command="{Binding DeleteDuplicatesCommand}"
                             IsVisible="{Binding HasResults}"
-                            IsEnabled="{Binding !IsApplying}"
-                            ToolTip.Tip="각 그룹에서 1개만 남기고 나머지를 즉시 삭제합니다"/>
+                            ToolTip.Tip="각 그룹에서 추천 파일만 남기고 확인 후 나머지를 삭제합니다"/>
                     <Button Classes="primary" Content="전체 적용"
                             Command="{Binding ApplyAllCommand}"
-                            IsVisible="{Binding HasResults}"
-                            IsEnabled="{Binding !IsApplying}"/>
+                            IsVisible="{Binding HasResults}"/>
+                </StackPanel>
                 </StackPanel>
             </Grid>
 
@@ -78,6 +83,25 @@
                                        Text="{Binding ErrorMessage}"
                                        TextWrapping="Wrap"/>
                 </StackPanel>
+            </Border>
+
+            <!-- ── 검사하지 못한 파일 ─────────────────────────────── -->
+            <Border DockPanel.Dock="Top" Classes="card" Margin="0 0 0 16"
+                    IsVisible="{Binding HasSkippedFiles}">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="{StaticResource StatusOrangeBrush}"
+                               FontWeight="SemiBold" TextWrapping="Wrap"
+                               Text="{Binding SkippedSummary}"/>
+                    <ScrollViewer MaxHeight="96">
+                        <SelectableTextBlock Classes="muted" Text="{Binding SkippedPaths}"/>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <!-- ── 같은 실제 파일을 가리키는 경로 ──────────────────── -->
+            <Border DockPanel.Dock="Top" Classes="card" Margin="0 0 0 16"
+                    IsVisible="{Binding HasMergedAliases}">
+                <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding MergedAliasSummary}"/>
             </Border>
 
             <!-- ── 요약 바 ────────────────────────────────────────── -->
@@ -143,7 +167,8 @@
 
             <!-- ── 정렬 / 필터 바 ─────────────────────────────────── -->
             <Border DockPanel.Dock="Top" Classes="card" Margin="0 0 0 12"
-                    IsVisible="{Binding HasResults}">
+                    IsVisible="{Binding HasResults}"
+                    IsEnabled="{Binding !IsApplying}">
                 <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                     <TextBlock Classes="muted" Text="정렬:" VerticalAlignment="Center"/>
                     <ComboBox ItemsSource="{x:Static vm:ResultsViewModel.SortModeLabels}"
@@ -171,13 +196,15 @@
                     <TextBlock Classes="section-title" HorizontalAlignment="Center"
                                Text="중복 파일이 없습니다!"/>
                     <TextBlock Classes="muted" HorizontalAlignment="Center"
-                               Text="검색된 폴더에 중복 파일이 없습니다."/>
+                               Text="검사한 파일 중에는 중복이 없습니다."/>
                 </StackPanel>
             </Border>
 
             <!-- ── 중복 그룹 목록 ─────────────────────────────────── -->
             <ScrollViewer IsVisible="{Binding HasResults}">
-                <ItemsControl ItemsSource="{Binding Groups}">
+                <!-- 일괄 처리 중에는 파일별 버튼·체크·자동 선택을 잠근다. 동의한 범위 밖의 작업이 끼어들지 않게 한다. -->
+                <ItemsControl ItemsSource="{Binding Groups}"
+                              IsEnabled="{Binding !IsApplying}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
                             <Border Classes="card" Margin="0 0 0 12"
@@ -297,7 +324,8 @@
                                                                              Text="{Binding StatusMessage}"
                                                                              VerticalAlignment="Center"
                                                                              HorizontalAlignment="Center"
-                                                                             IsVisible="{Binding IsDone}"/>
+                                                                             TextWrapping="Wrap"
+                                                                             IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
                                                         <!-- 작업 버튼 (즉시 처리) -->
                                                         <StackPanel Grid.Column="4"

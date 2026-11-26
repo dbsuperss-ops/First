@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    "마지막 사본 보존" 검사 프로그램. 실패한 항목 수를 종료 코드로 돌려준다(0이면 모두 통과).
+    앱 프로젝트는 단일 파일·자체 포함 설정이라 참조하지 않고, 필요한 소스를 직접 컴파일한다.
+    Windows 전용: 정션·하드 링크(mklink)와 파일 ID를 쓴다.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Src>..\..\src\DupeFinderPro</Src>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="$(Src)\Domain\**\*.cs" />
+    <Compile Include="$(Src)\Infrastructure\Detection\*.cs" />
+    <Compile Include="$(Src)\Infrastructure\Hashing\*.cs" />
+    <Compile Include="$(Src)\Infrastructure\FileSystem\*.cs" />
+    <Compile Include="$(Src)\Application\CleanupOrchestrator.cs;$(Src)\Application\ScanOrchestrator.cs;$(Src)\Application\ScanJobService.cs" />
+    <Compile Include="$(Src)\ViewModels\ViewModelBase.cs" />
+    <Compile Include="$(Src)\ViewModels\Duplicate\ResultsViewModel.cs;$(Src)\ViewModels\Duplicate\DuplicateGroupViewModel.cs;$(Src)\ViewModels\Duplicate\FileEntryViewModel.cs" />
+    <PackageReference Include="Avalonia" Version="11.3.12" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
+  </ItemGroup>
+</Project>

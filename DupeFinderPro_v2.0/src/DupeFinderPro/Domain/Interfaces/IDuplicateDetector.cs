@@ -4,7 +4,7 @@ namespace DupeFinderPro.Domain.Interfaces;
 
 public interface IDuplicateDetector
 {
-    Task<IReadOnlyList<DuplicateGroup>> DetectAsync(
+    Task<DetectionResult> DetectAsync(
         IReadOnlyList<FileEntry> files,
         IProgress<ScanProgress> progress,
         CancellationToken ct = default);

@@ -165,6 +165,8 @@
                     <TextBlock Classes="section-title" Text="스캔 옵션"/>
                     <CheckBox Content="하위 폴더 포함 (재귀)" IsChecked="{Binding Recursive}"/>
                     <CheckBox Content="시스템 파일 제외" IsChecked="{Binding ExcludeSystemFiles}"/>
+                    <CheckBox Content="빈 파일(0바이트) 포함" IsChecked="{Binding IncludeEmptyFiles}"
+                              ToolTip.Tip="빈 파일은 내용이 모두 같아 서로 관계없는 파일도 중복으로 묶입니다"/>
 
                     <!-- 파일 크기 -->
                     <StackPanel Spacing="6">

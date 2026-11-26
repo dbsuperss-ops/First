@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using DupeFinderPro.ViewModels.Duplicate;
@@ -21,6 +23,49 @@ public partial class ResultsView : UserControl
         AddHandler(PointerMovedEvent, OnPointerMoved, handledEventsToo: false);
         AddHandler(PointerReleasedEvent, (object? _, PointerReleasedEventArgs _) => _pendingDrag = null,
             handledEventsToo: false);
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is ResultsViewModel vm)
+                vm.ConfirmDeleteAsync = ConfirmDeleteAsync;
+        };
+    }
+
+    private async Task<bool> ConfirmDeleteAsync(int count)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return false;
+
+        var dialog = new Window
+        {
+            Title = "삭제 확인",
+            Width = 420,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        var cancel = new Button { Content = "취소", IsCancel = true, IsDefault = true };
+        var delete = new Button { Content = "삭제" };
+        cancel.Click += (_, _) => dialog.Close(false);
+        delete.Click += (_, _) => dialog.Close(true);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 8
+        };
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(delete);
+
+        var content = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"파일 {count}개를 삭제합니다. 네트워크 드라이브처럼 휴지통이 없는 위치의 파일은 복구하지 못할 수 있습니다.",
+            TextWrapping = TextWrapping.Wrap
+        });
+        content.Children.Add(buttons);
+        dialog.Content = content;
+
+        return await dialog.ShowDialog<bool>(owner);
     }
 
     private async void BrowseQuarantineFolder_Click(object? sender, RoutedEventArgs e)

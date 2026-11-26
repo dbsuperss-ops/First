@@ -13,6 +13,7 @@ public sealed partial class ResultsViewModel : ViewModelBase
     private readonly CleanupOrchestrator _cleanup;
 
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _applyCts;
     private ScanJob? _currentJob;
 
     // ── Scan progress ─────────────────────────────────────────────────────
@@ -33,10 +34,17 @@ public sealed partial class ResultsViewModel : ViewModelBase
     [ObservableProperty] private string _scanName      = string.Empty;
     [ObservableProperty] private string _errorMessage  = string.Empty;
     [ObservableProperty] private bool   _hasScanError;
+    [ObservableProperty] private bool   _hasSkippedFiles;
+    [ObservableProperty] private string _skippedSummary = string.Empty;
+    [ObservableProperty] private string _skippedPaths   = string.Empty;
+    [ObservableProperty] private bool   _hasMergedAliases;
+    [ObservableProperty] private string _mergedAliasSummary = string.Empty;
+
+    /// <summary>삭제할 파일 수를 받아 사용자의 동의를 묻는다. View가 설정하며, 없으면 일괄·파일별 모두 삭제하지 않는다.</summary>
+    public Func<int, Task<bool>>? ConfirmDeleteAsync { get; set; }
 
     // ── Cleanup options ────────────────────────────────────────────────────
-    [ObservableProperty] private string _quarantinePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "DupeFinderPro", "Quarantine");
+    [ObservableProperty] private string _quarantinePath = QuarantineFolder.DefaultPath;
     [ObservableProperty] private string _moveToPath = string.Empty;
     [ObservableProperty] private bool   _isApplying;
 
@@ -76,6 +84,8 @@ public sealed partial class ResultsViewModel : ViewModelBase
         IsEmpty = false;
         HasScanError = false;
         ErrorMessage = string.Empty;
+        HasSkippedFiles = false;
+        HasMergedAliases = false;
         Groups.Clear();
         PhaseLabel = "준비 중…";
         CurrentFile = string.Empty;
@@ -138,12 +148,20 @@ public sealed partial class ResultsViewModel : ViewModelBase
         TotalWasted  = FormatBytes(result.TotalWastedBytes);
         ScanDuration = $"{result.ElapsedTime.TotalSeconds:F1}s";
 
+        HasSkippedFiles = result.SkippedFiles.Count > 0;
+        SkippedSummary  = $"검사하지 못한 파일 {result.SkippedFiles.Count}개 (읽을 수 없거나 클라우드에만 있음). 중복 여부를 알 수 없습니다.";
+        SkippedPaths    = string.Join(Environment.NewLine, result.SkippedFiles.Select(f => f.FullPath));
+
+        var aliases = result.MergedAliases ?? [];
+        HasMergedAliases   = aliases.Count > 0;
+        MergedAliasSummary = $"같은 실제 파일을 가리키는 경로 {aliases.Count}개(정션·매핑 드라이브·하드 링크 등)는 한 번만 셌습니다.";
+
         _allGroups.Clear();
         Groups.Clear();
         var index = 1;
         foreach (var g in result.DuplicateGroups.OrderByDescending(g => g.WastedBytes))
         {
-            var groupVm = new DuplicateGroupViewModel(g, _cleanup) { GroupNumber = index++ };
+            var groupVm = new DuplicateGroupViewModel(g, _cleanup, ConfirmDeleteForFileAsync) { GroupNumber = index++ };
             SyncPathsToGroup(groupVm);
             _allGroups.Add(groupVm);
         }
@@ -152,6 +170,9 @@ public sealed partial class ResultsViewModel : ViewModelBase
         HasResults = TotalGroups > 0;
         IsEmpty    = TotalGroups == 0;
     }
+
+    private Task<bool> ConfirmDeleteForFileAsync(int count) =>
+        ConfirmDeleteAsync?.Invoke(count) ?? Task.FromResult(false);
 
     private void SyncPathsToGroup(DuplicateGroupViewModel group)
     {
@@ -252,18 +273,10 @@ public sealed partial class ResultsViewModel : ViewModelBase
             g.IsGroupChecked = true;
     }
 
-    /// <summary>각 그룹에서 첫 번째 파일 유지, 나머지 삭제 설정 후 즉시 적용합니다.</summary>
+    /// <summary>각 그룹에서 추천 파일만 남기고 나머지를 지우는 계획을 만들어, 확인을 받은 뒤 실행합니다.</summary>
     [RelayCommand]
-    private async Task DeleteDuplicatesAsync()
-    {
-        if (IsApplying) return;
-        foreach (var g in Groups)
-        {
-            g.AutoSelectCommand.Execute(null);
-            g.IsGroupChecked = true;
-        }
-        await ApplyAllAsync();
-    }
+    private Task DeleteDuplicatesAsync() =>
+        ConfirmAndRunAsync(g => g.PlanDuplicates(QuarantinePath, MoveToPath), showPlan: true);
 
     /// <summary>체크된 파일(Keep 제외)을 삭제로 설정합니다.</summary>
     [RelayCommand]
@@ -296,18 +309,46 @@ public sealed partial class ResultsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task ApplyAllAsync()
+    private Task ApplyAllAsync() =>
+        ConfirmAndRunAsync(g => g.PlanChecked(QuarantinePath, MoveToPath), showPlan: false);
+
+    /// <summary>진행 중인 일괄 처리를 멈춘다. 이미 끝난 파일은 그대로이고, 남은 파일은 "취소됨"이 된다.</summary>
+    [RelayCommand]
+    private void CancelApply() => _applyCts?.Cancel();
+
+    /// <summary>
+    /// 동의하기 전에 그룹마다 실행 계획을 확정하고, 동의한 뒤에는 그 계획만 실행합니다.
+    /// 확인 창이 떠 있는 동안 선택값이나 파일이 바뀌어도 실행 대상은 바뀌지 않습니다.
+    /// </summary>
+    private async Task ConfirmAndRunAsync(Func<DuplicateGroupViewModel, GroupPlan?> planFor, bool showPlan)
     {
         if (IsApplying) return;
         IsApplying = true;
         try
         {
+            var plans = Groups
+                .Select(g => (Group: g, Plan: planFor(g)))
+                .Where(x => x.Plan is not null)
+                .Select(x => (x.Group, Plan: x.Plan!))
+                .ToList();
+
+            var deleteCount = plans.Sum(x => x.Plan.Actions.Count(a => a.Action == FileAction.Delete));
+            if (deleteCount > 0 &&
+                (ConfirmDeleteAsync is null || !await ConfirmDeleteAsync(deleteCount)))
+                return;
+
+            if (showPlan)
+                foreach (var (group, plan) in plans)
+                    group.ShowPlan(plan);
+
             using var cts = new CancellationTokenSource();
-            foreach (var g in Groups)
-                await g.ApplyCheckedAsync(QuarantinePath, MoveToPath, cts.Token);
+            _applyCts = cts;
+            foreach (var (group, plan) in plans)
+                await group.ExecuteAsync(plan, cts.Token);
         }
         finally
         {
+            _applyCts = null;
             IsApplying = false;
         }
     }
@@ -319,6 +360,8 @@ public sealed partial class ResultsViewModel : ViewModelBase
         IsScanning = false;
         HasScanError = false;
         ErrorMessage = string.Empty;
+        HasSkippedFiles = false;
+        HasMergedAliases = false;
         Groups.Clear();
         SelectedFile = null;
         PreviewBitmap = null;
