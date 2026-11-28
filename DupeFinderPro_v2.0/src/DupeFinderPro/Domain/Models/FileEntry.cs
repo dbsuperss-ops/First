@@ -8,6 +8,7 @@ public sealed record FileEntry(
     DateTime CreatedAt,
     int SourcePriority)
 {
+    public FileIdentity? Identity { get; init; }
     public string? PartialHash { get; init; }
     public string? FullHash { get; init; }
 }

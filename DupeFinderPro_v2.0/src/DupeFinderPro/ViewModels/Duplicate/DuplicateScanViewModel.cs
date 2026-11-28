@@ -51,6 +51,7 @@ public sealed partial class DuplicateScanViewModel : ViewModelBase
     // ── Safety ────────────────────────────────────────────────────────────
     [ObservableProperty] private bool _excludeSystemFiles = true;
     [ObservableProperty] private bool _recursive          = true;
+    [ObservableProperty] private bool _includeEmptyFiles;
 
     // ── Job meta ─────────────────────────────────────────────────────────
     [ObservableProperty] private string _scanName = $"스캔 {DateTime.Now:yyyy-MM-dd HH:mm}";
@@ -155,7 +156,8 @@ public sealed partial class DuplicateScanViewModel : ViewModelBase
             ModifiedFrom:      ModifiedFrom,
             ModifiedTo:        ModifiedTo,
             ExcludeSystemFiles: ExcludeSystemFiles,
-            Recursive:         Recursive);
+            Recursive:         Recursive,
+            IncludeEmptyFiles: IncludeEmptyFiles);
     }
 
     private void ResetForm()
@@ -176,6 +178,7 @@ public sealed partial class DuplicateScanViewModel : ViewModelBase
         ModifiedTo           = null;
         ExcludeSystemFiles   = true;
         Recursive            = true;
+        IncludeEmptyFiles    = false;
         foreach (var ft in FileTypeCategories) ft.IsSelected = false;
     }
 

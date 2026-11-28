@@ -15,7 +15,8 @@ public sealed record ScanFilter(
     DateTime? ModifiedFrom,
     DateTime? ModifiedTo,
     bool ExcludeSystemFiles,
-    bool Recursive)
+    bool Recursive,
+    bool IncludeEmptyFiles = false)
 {
     public static readonly ScanFilter Empty = new(
         IncludePaths: [],

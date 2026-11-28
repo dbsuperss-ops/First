@@ -49,6 +49,8 @@ public sealed partial class App : AvaloniaApp
         sc.AddSingleton<IFileScanner,          FileScanner>();
         sc.AddSingleton<IDuplicateDetector,    DuplicateDetector>();
         sc.AddSingleton<IFileOperationService, FileOperationService>();
+        sc.AddSingleton<IFileVerifier,         FileVerifier>();
+        sc.AddSingleton<ICleanupLog>(_ => new JsonlCleanupLog());
         sc.AddSingleton<IAutoSelectStrategy,   PriorityAutoSelectStrategy>();
         sc.AddSingleton<IScanJobRepository,    InMemoryScanJobRepository>();
 
