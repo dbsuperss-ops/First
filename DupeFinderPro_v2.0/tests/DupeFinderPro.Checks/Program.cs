@@ -212,6 +212,31 @@ try
     Check($"I19 quarantine and recycle bin folders are never collected (found={string.Join(",", qFound.Select(f => Path.GetRelativePath(q, f.FullPath)))})",
         qFound.Count == 1 && qFound[0].FullPath == Path.Combine(q, "orig.bin"));
 
+    // 저장소(.git 폴더·워크트리의 .git 파일)와 패키지 폴더는 항상, AppData는 시스템 파일 보호가 켜져 있으면 수집하지 않는다.
+    var proj = Path.Combine(dir, "proj-scan");
+    var repo = Path.Combine(proj, "repo");
+    var worktree = Path.Combine(proj, "worktree");
+    Directory.CreateDirectory(Path.Combine(repo, ".git"));
+    Directory.CreateDirectory(Path.Combine(repo, "src"));
+    Directory.CreateDirectory(worktree);
+    File.WriteAllText(Path.Combine(worktree, ".git"), "gitdir: ../repo/.git/worktrees/w");
+    var depDirs = new[] { "node_modules", ".venv", "site-packages" }.Select(d => Path.Combine(proj, "app", d, "pkg")).ToArray();
+    foreach (var d in depDirs) Directory.CreateDirectory(d);
+    Directory.CreateDirectory(Path.Combine(proj, "plain"));
+    foreach (var p in new[] { Path.Combine(repo, "src", "uv.lock"), Path.Combine(worktree, "uv.lock"), Path.Combine(proj, "plain", "uv.lock") }
+                 .Concat(depDirs.Select(d => Path.Combine(d, "uv.lock"))))
+        File.WriteAllBytes(p, Enumerable.Repeat((byte)8, 128).ToArray());
+    var projFound = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [proj, repo], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
+    Check($"repositories, worktrees and package folders are never collected (found={string.Join(",", projFound.Select(f => Path.GetRelativePath(proj, f.FullPath)))})",
+        projFound.Count == 1 && projFound[0].FullPath == Path.Combine(proj, "plain", "uv.lock"));
+    var appData = Path.Combine(proj, "AppData", "Local", "tool");
+    Directory.CreateDirectory(appData);
+    File.WriteAllBytes(Path.Combine(appData, "uv.lock"), Enumerable.Repeat((byte)8, 128).ToArray());
+    var appDataOn = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [appData] }, new Progress<ScanProgress>())).Files;
+    var appDataOff = (await new FileScanner().ScanAsync(ScanFilter.Empty with { IncludePaths = [appData], ExcludeSystemFiles = false }, new Progress<ScanProgress>())).Files;
+    Check($"AppData is skipped while system file protection is on ({appDataOn.Count}/{appDataOff.Count})",
+        appDataOn.Count == 0 && appDataOff.Count == 1);
+
     var empty = Path.Combine(dir, "empty");
     Directory.CreateDirectory(empty);
     File.WriteAllBytes(Path.Combine(empty, ".gitkeep"), []);

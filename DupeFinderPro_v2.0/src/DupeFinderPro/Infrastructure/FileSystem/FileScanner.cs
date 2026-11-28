@@ -7,12 +7,18 @@ public sealed class FileScanner : IFileScanner
 {
     private static readonly string[] ProtectedSegments =
     [
-        @"\Windows\", @"\Program Files\", @"\Program Files (x86)\",
-        @"\AppData\Local\Temp\", @"\$RECYCLE.BIN\", @"\System Volume Information\"
+        @"\Windows\", @"\Program Files\", @"\Program Files (x86)\", @"\ProgramData\",
+        @"\AppData\", @"\$RECYCLE.BIN\", @"\System Volume Information\"
     ];
 
-    // 설정과 무관하게 수집하지 않는다. 여기 있는 파일을 남는 사본으로 세면, 비울 때 마지막 사본이 사라진다.
-    private static readonly string[] AlwaysExcludedSegments = [@"\$RECYCLE.BIN\", @"\System Volume Information\"];
+    // 설정과 무관하게 수집하지 않는다. 휴지통·격리 폴더 파일을 남는 사본으로 세면, 비울 때 마지막 사본이 사라진다.
+    // 패키지·빌드 폴더와 Git 저장소는 일부러 같은 파일을 여러 곳에 두므로, 한쪽을 지우면 프로그램이 깨진다
+    // (2026-11-26 실측: node_modules·.venv·uv 캐시의 사본과 저장소의 잠금 파일·그림이 지워져 빌드와 테스트가 깨졌다).
+    private static readonly string[] AlwaysExcludedSegments =
+    [
+        @"\$RECYCLE.BIN\", @"\System Volume Information\",
+        @"\.git\", @"\node_modules\", @"\.venv\", @"\venv\", @"\site-packages\", @"\__pycache__\", @"\.next\"
+    ];
     private static readonly string DefaultQuarantinePrefix =
         QuarantineFolder.DefaultPath.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
@@ -42,7 +48,7 @@ public sealed class FileScanner : IFileScanner
             // 검색 폴더가 겹쳐도 파일은 한 번만 수집한다. 두 번 수집하면 하나뿐인 파일이 자기 자신의 중복이 된다.
             // 우선순위가 높은 폴더부터 훑으므로 먼저 수집한 항목이 남는다.
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var quarantineDirs = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            var blockedDirs = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var (path, priority) in paths)
             {
@@ -59,7 +65,7 @@ public sealed class FileScanner : IFileScanner
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    if (!seen.Add(filePath) || IsAlwaysExcluded(filePath, quarantineDirs))
+                    if (!seen.Add(filePath) || IsAlwaysExcluded(filePath, blockedDirs))
                         continue;
 
                     try
@@ -110,8 +116,11 @@ public sealed class FileScanner : IFileScanner
         }
     }
 
-    /// <summary>휴지통·시스템 볼륨 정보·격리 폴더(기본 경로 또는 격리 표식이 있는 폴더와 그 하위) 안의 파일인지.</summary>
-    private static bool IsAlwaysExcluded(string filePath, Dictionary<string, bool> quarantineDirs)
+    /// <summary>
+    /// 휴지통·시스템 볼륨 정보·패키지 폴더, 격리 폴더(기본 경로 또는 격리 표식이 있는 폴더),
+    /// Git 저장소(.git 폴더나 워크트리의 .git 파일이 있는 폴더)와 그 하위의 파일인지.
+    /// </summary>
+    private static bool IsAlwaysExcluded(string filePath, Dictionary<string, bool> blockedDirs)
     {
         if (AlwaysExcludedSegments.Any(seg => filePath.Contains(seg, StringComparison.OrdinalIgnoreCase)) ||
             filePath.StartsWith(DefaultQuarantinePrefix, StringComparison.OrdinalIgnoreCase))
@@ -119,10 +128,12 @@ public sealed class FileScanner : IFileScanner
 
         for (var dir = Path.GetDirectoryName(filePath); dir is not null; dir = Path.GetDirectoryName(dir))
         {
-            if (!quarantineDirs.TryGetValue(dir, out var marked))
+            if (!blockedDirs.TryGetValue(dir, out var marked))
             {
-                marked = File.Exists(Path.Combine(dir, QuarantineFolder.MarkerFileName));
-                quarantineDirs[dir] = marked;
+                var git = Path.Combine(dir, ".git");
+                marked = File.Exists(Path.Combine(dir, QuarantineFolder.MarkerFileName)) ||
+                         Directory.Exists(git) || File.Exists(git);
+                blockedDirs[dir] = marked;
             }
             if (marked)
                 return true;
